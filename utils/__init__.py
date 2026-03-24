@@ -1,1 +1,1 @@
-# Utility functions - validation, metrics, logging
+"""Utility modules: validation, metrics, logging."""

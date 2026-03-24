@@ -1,1 +1,1 @@
-# Signal filtering and reconstruction modules
+"""Signal filtering and reconstruction modules."""

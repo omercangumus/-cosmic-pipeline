@@ -1,0 +1,70 @@
+# Default pipeline configuration for cosmic-pipeline
+
+# Data source configuration
+data_source:
+  type: "synthetic"  # Options: synthetic, goes, csv
+  synthetic:
+    n_points: 10000
+    seed: 42
+  goes:
+    api_url: "https://services.swpc.noaa.gov/json/goes/primary/differential-protons-1-day.json"
+    cache_enabled: true
+    timeout_seconds: 10
+
+# Fault injection configuration (for synthetic data)
+fault_config:
+  seu_count: 15
+  tid_slope: 0.003
+  gap_count: 4
+  gap_size_range: [10, 40]
+  noise_std_max: 2.0
+
+# DSP detector configuration
+dsp_detector:
+  methods: ["zscore", "iqr", "isolation_forest"]
+  zscore_threshold: 3.5
+  iqr_multiplier: 1.5
+  iforest_contamination: 0.05
+
+# LSTM detector configuration
+lstm_detector:
+  enabled: true
+  hidden_dim: 64
+  num_layers: 2
+  window_size: 50
+  threshold_percentile: 95
+  use_gpu: true
+  model_path: "models/lstm_ae.pth"
+
+# Ensemble voting configuration
+ensemble:
+  min_agreement: 2  # Minimum number of detectors that must agree
+  weight_by_confidence: false
+
+# Classic filter configuration
+classic_filter:
+  methods: ["median", "savitzky_golay", "wavelet"]
+  median_window: 5
+  sg_window: 11
+  sg_polyorder: 3
+  wavelet_family: "db4"
+  wavelet_level: 3
+
+# ML reconstructor configuration
+ml_reconstructor:
+  enabled: true
+  confidence_threshold: 0.7
+  blend_window: 10
+  fallback_to_interpolation: true
+
+# Validation configuration
+validation:
+  min_signal_length: 100
+  max_nan_ratio: 0.5
+  check_monotonic_time: true
+
+# Logging configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  log_file: "logs/pipeline.log"
+  console_output: true

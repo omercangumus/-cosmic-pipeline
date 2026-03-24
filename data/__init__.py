@@ -1,1 +1,1 @@
-# Data layer - synthetic generation and GOES downloader
+"""Data layer for cosmic-pipeline: synthetic generation and GOES data retrieval."""

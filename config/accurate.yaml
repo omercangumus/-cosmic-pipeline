@@ -1,0 +1,62 @@
+# High-accuracy configuration - all detectors and filters enabled
+
+data_source:
+  type: "synthetic"
+  synthetic:
+    n_points: 10000
+    seed: 42
+
+fault_config:
+  seu_count: 20
+  tid_slope: 0.004
+  gap_count: 5
+  gap_size_range: [15, 50]
+  noise_std_max: 2.5
+
+# Use all DSP methods
+dsp_detector:
+  methods: ["zscore", "iqr", "isolation_forest"]
+  zscore_threshold: 3.0
+  iqr_multiplier: 1.5
+  iforest_contamination: 0.03
+
+# Enable LSTM with larger model
+lstm_detector:
+  enabled: true
+  hidden_dim: 128
+  num_layers: 3
+  window_size: 100
+  threshold_percentile: 98
+  use_gpu: true
+  model_path: "models/lstm_ae_large.pth"
+
+# Require 3 out of 4 detectors to agree
+ensemble:
+  min_agreement: 3
+  weight_by_confidence: true
+
+# Use all filters
+classic_filter:
+  methods: ["median", "savitzky_golay", "wavelet"]
+  median_window: 7
+  sg_window: 15
+  sg_polyorder: 4
+  wavelet_family: "db6"
+  wavelet_level: 4
+
+# Enable ML reconstruction with high confidence threshold
+ml_reconstructor:
+  enabled: true
+  confidence_threshold: 0.8
+  blend_window: 15
+  fallback_to_interpolation: true
+
+validation:
+  min_signal_length: 500
+  max_nan_ratio: 0.3
+  check_monotonic_time: true
+
+logging:
+  level: "DEBUG"
+  log_file: "logs/pipeline_accurate.log"
+  console_output: true

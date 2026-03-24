@@ -1,1 +1,1 @@
-# Configuration management
+"""Configuration management: dataclasses and parsers."""

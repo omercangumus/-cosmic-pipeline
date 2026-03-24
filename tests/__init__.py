@@ -1,1 +1,1 @@
-# Test suite
+"""Test suite for cosmic-pipeline."""
