@@ -1,32 +1,16 @@
-# Pull Request
+## Summary
 
-## Description
-<!-- Provide a brief description of the changes in this PR -->
+<!-- What does this PR do? -->
 
-## Type of Change
-- [ ] feat: New feature
-- [ ] fix: Bug fix
-- [ ] chore: Maintenance/refactoring
-- [ ] docs: Documentation update
+## Checklist
 
-## Related Requirements
-<!-- List requirement numbers from requirements.md -->
-- Requirement X.Y
+- [ ] Tests pass (`make test`)
+- [ ] No hardcoded absolute paths
+- [ ] Docstrings added to all functions
+- [ ] Branch merged from develop (not directly from main)
+- [ ] No *.pt, *.pth, or *.nc files committed
 
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] All tests pass locally
-- [ ] Manual testing completed
+## Checkpoint
 
-## Review Checklist
-- [ ] Code includes type hints on all functions
-- [ ] Code includes docstrings on all public functions/classes
-- [ ] Error handling is graceful (no crashes)
-- [ ] No placeholder code (all implementations are functional)
-- [ ] Code follows project structure conventions
-- [ ] Configuration changes documented
-- [ ] Performance requirements met (if applicable)
-
-## Additional Notes
-<!-- Any additional context, screenshots, or information -->
+- [ ] Day 1 checkpoint ✅
+- [ ] Day 2 checkpoint ✅

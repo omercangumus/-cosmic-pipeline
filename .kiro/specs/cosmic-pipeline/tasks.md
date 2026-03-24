@@ -12,7 +12,7 @@ All code must include type hints, docstrings, and graceful error handling. No pl
 
 ## Tasks
 
-- [-] 1. Project setup and infrastructure (Ömer)
+- [x] 1. Project setup and infrastructure (Ömer)
   - Initialize Git repository with main/develop branches
   - Create project directory structure (data/, pipeline/, models/, dashboard/, config/, utils/, tests/)
   - Create .gitignore (exclude __pycache__, .pytest_cache, *.pyc, .env, models/*.pth, data/cache/)
@@ -22,12 +22,12 @@ All code must include type hints, docstrings, and graceful error handling. No pl
   - Create README.md with project overview and quickstart instructions
   - _Requirements: 13.3, 14.1, 14.2, 14.3, 14.5_
 
-- [ ] 2. Implement synthetic telemetry generator (Ömer)
-  - [ ] 2.1 Create data/synthetic_generator.py with FaultConfig dataclass
+- [x] 2. Implement synthetic telemetry generator (Ömer)
+  - [x] 2.1 Create data/synthetic_generator.py with FaultConfig dataclass
     - Implement FaultConfig with seu_probability, tid_drift_rate, gap_probability, gap_size_range, noise_snr_db
     - _Requirements: 1.2, 1.3, 1.4, 1.5_
   
-  - [ ] 2.2 Implement SyntheticGenerator.generate() method
+  - [x] 2.2 Implement SyntheticGenerator.generate() method
     - Generate clean sinusoidal signal with configurable duration and sampling_rate
     - Inject SEU bit-flips at random locations based on seu_probability
     - Inject TID drift as gradual baseline shift using exponential function
@@ -44,12 +44,12 @@ All code must include type hints, docstrings, and graceful error handling. No pl
     - Test edge case: zero fault probability produces clean signal
     - _Requirements: 12.2_
 
-- [ ] 3. Implement GOES satellite data downloader (Ömer)
-  - [ ] 3.1 Create data/goes_downloader.py with GOESConfig dataclass
+- [x] 3. Implement GOES satellite data downloader (Ömer)
+  - [x] 3.1 Create data/goes_downloader.py with GOESConfig dataclass
     - Implement GOESConfig with api_url, cache_enabled, timeout_seconds
     - _Requirements: 2.2_
   
-  - [ ] 3.2 Implement GOESDownloader.download() method
+  - [x] 3.2 Implement GOESDownloader.download() method
     - Make HTTP GET request to NOAA SWPC JSON API with timeout
     - Parse JSON response into pandas DataFrame with [timestamp, proton_flux] columns
     - Validate data completeness (no missing timestamps in range)
@@ -265,13 +265,13 @@ All code must include type hints, docstrings, and graceful error handling. No pl
 - [ ] 13. Checkpoint - Core pipeline complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. Implement Streamlit dashboard (Ömer)
-  - [ ] 14.1 Create dashboard/app.py with Streamlit interface
+- [-] 14. Implement Streamlit dashboard (Ömer)
+  - [x] 14.1 Create dashboard/app.py with Streamlit interface
     - Set page config with dark theme (theme.base="dark")
     - Create three tabs: "Synthetic Data", "GOES Data", "Comparison"
     - _Requirements: 8.1, 8.10_
   
-  - [ ] 14.2 Implement Synthetic Data tab
+  - [x] 14.2 Implement Synthetic Data tab
     - Add sliders for fault injection parameters (SEU probability, TID drift, gap probability, noise SNR)
     - Add button to generate synthetic signal
     - Display interactive Plotly time-series plot with original, corrupted, and cleaned signals
@@ -282,7 +282,7 @@ All code must include type hints, docstrings, and graceful error handling. No pl
     - Add JSON export button for metrics
     - _Requirements: 8.2, 8.3, 8.5, 8.6, 8.7, 8.8, 8.9_
   
-  - [ ] 14.3 Implement GOES Data tab
+  - [x] 14.3 Implement GOES Data tab
     - Add date range picker for GOES data retrieval
     - Add button to download GOES data
     - Display interactive Plotly time-series plot with original and cleaned proton flux
@@ -292,7 +292,7 @@ All code must include type hints, docstrings, and graceful error handling. No pl
     - Handle network errors gracefully (display error message, don't crash)
     - _Requirements: 8.2, 8.3, 8.5, 8.6, 8.8, 15.2_
   
-  - [ ] 14.4 Implement Comparison tab
+  - [-] 14.4 Implement Comparison tab
     - Add side-by-side comparison of different detector methods
     - Display detection results from each detector (DSP methods, LSTM)
     - Display ensemble voting results
@@ -300,7 +300,7 @@ All code must include type hints, docstrings, and graceful error handling. No pl
     - Update plots dynamically when thresholds change
     - _Requirements: 8.4, 8.5_
   
-  - [ ] 14.5 Implement session state initialization
+  - [-] 14.5 Implement session state initialization
     - Initialize all session state variables with default values on first load
     - Handle missing session state gracefully (no crashes)
     - _Requirements: 8.11_
@@ -337,18 +337,18 @@ All code must include type hints, docstrings, and graceful error handling. No pl
     - Test trained model can be loaded and used for inference
     - _Requirements: 12.2_
 
-- [ ] 17. Create example configuration files (Ömer)
-  - [ ] 17.1 Create config/default.yaml with default pipeline configuration
+- [x] 17. Create example configuration files (Ömer)
+  - [x] 17.1 Create config/default.yaml with default pipeline configuration
     - Include all component configurations with reasonable defaults
     - Add comments explaining each parameter
     - _Requirements: 9.5, 13.3_
   
-  - [ ] 17.2 Create config/fast.yaml with fast processing configuration
+  - [x] 17.2 Create config/fast.yaml with fast processing configuration
     - Disable LSTM detector for speed
     - Use only Z-score and median filter
     - _Requirements: 9.5_
   
-  - [ ] 17.3 Create config/accurate.yaml with high-accuracy configuration
+  - [x] 17.3 Create config/accurate.yaml with high-accuracy configuration
     - Enable all detectors
     - Use ensemble voting with min_agreement=2
     - Use both classic filters and ML reconstruction

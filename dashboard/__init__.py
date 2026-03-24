@@ -1,1 +1,1 @@
-# Streamlit dashboard application
+"""Streamlit dashboard for visualization and interaction."""

@@ -1,0 +1,47 @@
+# Fast processing configuration - optimized for speed
+
+data_source:
+  type: "synthetic"
+  synthetic:
+    n_points: 5000
+    seed: 42
+
+fault_config:
+  seu_count: 10
+  tid_slope: 0.002
+  gap_count: 2
+  gap_size_range: [10, 20]
+  noise_std_max: 1.5
+
+# Only use Z-score for fast detection
+dsp_detector:
+  methods: ["zscore"]
+  zscore_threshold: 3.0
+
+# Disable LSTM for speed
+lstm_detector:
+  enabled: false
+
+# Simple majority voting
+ensemble:
+  min_agreement: 1
+  weight_by_confidence: false
+
+# Only median filter for speed
+classic_filter:
+  methods: ["median"]
+  median_window: 5
+
+# Disable ML reconstruction
+ml_reconstructor:
+  enabled: false
+
+validation:
+  min_signal_length: 100
+  max_nan_ratio: 0.5
+  check_monotonic_time: false
+
+logging:
+  level: "WARNING"
+  log_file: "logs/pipeline_fast.log"
+  console_output: false

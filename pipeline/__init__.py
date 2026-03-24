@@ -1,1 +1,1 @@
-# Pipeline orchestration and core processing
+"""Pipeline core: detection, filtering, and orchestration."""

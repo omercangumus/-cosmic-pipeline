@@ -1,1 +1,1 @@
-# Anomaly detection modules
+"""Anomaly detection modules: DSP and ML methods."""

@@ -1,41 +1,20 @@
-# Python cache
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-
-# Environment
-.env
-.venv
-env/
-venv/
-ENV/
-
-# Models
-models/*.pth
-models/*.pt
-
-# Data cache
+*.pyc
+*.pyo
+*.pt
+*.pth
+*.nc
+*.h5
+data/raw/
 data/cache/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Logs
-logs/
-*.log
-
-# OS
+.env
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
 .DS_Store
-Thumbs.db
+.streamlit/secrets.toml
+notebooks/.ipynb_checkpoints/
+.pytest_cache/
+logs/
