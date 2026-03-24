@@ -106,3 +106,50 @@ def test_pipeline_clean_signal_minimal_changes():
     metrics = calculate_metrics(clean, result["cleaned_data"], ground_truth=clean)
     # Clean signal should stay almost unchanged
     assert metrics["rmse"] < 1.0
+
+
+def test_pipeline_invalid_method():
+    df = generate_clean_signal(n=500)
+    with pytest.raises(ValueError, match="Invalid method"):
+        run_pipeline(df, method="invalid")
+
+
+# --- ML method tests (require trained model) ---
+
+from pathlib import Path
+MODEL_EXISTS = Path("models/lstm_ae.pt").exists()
+
+
+@pytest.mark.skipif(not MODEL_EXISTS, reason="Trained model not found")
+class TestPipelineML:
+    def test_ml_method_runs(self, synthetic_data):
+        _, corrupted, _ = synthetic_data
+        result = run_pipeline(corrupted, method="ml")
+        assert result["metrics"]["faults_detected"] > 0
+        assert result["cleaned_data"]["value"].isna().sum() == 0
+
+    def test_both_method_runs(self, synthetic_data):
+        _, corrupted, _ = synthetic_data
+        result = run_pipeline(corrupted, method="both")
+        assert result["metrics"]["faults_detected"] > 0
+        assert result["cleaned_data"]["value"].isna().sum() == 0
+
+    def test_both_uses_more_detectors(self, synthetic_data):
+        _, corrupted, _ = synthetic_data
+        classic = run_pipeline(corrupted, method="classic")
+        both = run_pipeline(corrupted, method="both")
+        # 'both' has more detector types in fault_timeline
+        classic_types = set()
+        both_types = set()
+        for ft in classic["fault_timeline"]["fault_type"]:
+            classic_types.update(ft.split("+"))
+        for ft in both["fault_timeline"]["fault_type"]:
+            both_types.update(ft.split("+"))
+        assert len(both_types) >= len(classic_types)
+
+    def test_ml_improves_signal(self, synthetic_data):
+        clean, corrupted, _ = synthetic_data
+        result = run_pipeline(corrupted, method="ml")
+        before = calculate_metrics(corrupted, corrupted, ground_truth=clean)
+        after = calculate_metrics(corrupted, result["cleaned_data"], ground_truth=clean)
+        assert after["rmse"] < before["rmse"]
