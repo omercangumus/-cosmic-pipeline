@@ -51,7 +51,7 @@ Classic    ML
 | Role | Person |
 |------|--------|
 | 🟠 Python / AI / Algo | Ahmet Hüsrev Sayın |
-| 🔵 Infra / Dashboard  | Ömer Cangümuş |
+| 🔵 Infra / Dashboard  | Ömer Can Gümüş |
 
 ## Branch Strategy
 
