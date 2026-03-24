@@ -24,3 +24,26 @@ print('Generated: data/raw/synthetic_corrupted.csv')"
 
 lint:
 	python -m pylint pipeline/ data/ models/ utils/ dashboard/ || true
+
+# ─── Docker ───────────────────────────────────────────
+docker-build:
+	docker compose build --no-cache
+
+docker-run:
+	docker compose up -d
+
+docker-stop:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f cosmic-pipeline
+
+docker-shell:
+	docker compose exec cosmic-pipeline bash
+
+docker-clean:
+	docker compose down --rmi all --volumes --remove-orphans
+
+# Tek komutla build + başlat
+docker-deploy: docker-build docker-run
+	@echo "✅ Dashboard: http://localhost:8501"
