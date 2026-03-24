@@ -1,0 +1,39 @@
+# Git
+.git/
+.github/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Model weights — volume mount ile gelir
+models/lstm_ae.pt
+models/*.pt
+models/*.pth
+
+# Veri dosyaları — volume mount ile gelir
+data/cache/
+data/raw/
+*.nc
+*.h5
+*.hdf5
+
+# Kiro/IDE
+.kiro/
+.vscode/
+*.md
+
+# Test dosyaları — image'a girmez
+tests/
+notebooks/
+
+# Ortam dosyaları
+.env
+.env.*
+venv/
+.venv/
