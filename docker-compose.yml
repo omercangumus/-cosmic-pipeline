@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  cosmic-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cosmic-pipeline-app
+    ports:
+      - "8501:8501"
+    volumes:
+      # LSTM model dosyası — commit edilmez, yerelden mount edilir
+      - ./models:/app/models
+      # GOES cache ve raw veri
+      - ./data/cache:/app/data/cache
+      - ./data/raw:/app/data/raw
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
