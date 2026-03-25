@@ -4,6 +4,20 @@
 
 ## Quickstart
 
+### 🐳 Docker (Recommended)
+
+```bash
+# Windows
+run.bat
+
+# Linux/Mac
+make docker-deploy
+```
+
+Dashboard otomatik açılır: http://localhost:8501
+
+### 🐍 Local Python
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -68,6 +82,7 @@ Tags: `v0.1-day1-checkpoint` · `v1.0-hackathon-final`
 
 ## Commands
 
+### Local Development
 ```bash
 make install   # install dependencies
 make run       # launch Streamlit dashboard
@@ -75,6 +90,30 @@ make test      # run pytest with coverage
 make train     # train LSTM AE model
 make generate  # generate synthetic test data
 make lint      # run linting checks
+```
+
+### Docker Commands
+```bash
+# Quick start
+make docker-deploy      # build + start (first time)
+make docker-quick       # start with cache (faster)
+
+# Management
+make docker-up          # start containers
+make docker-down        # stop containers
+make docker-restart     # restart containers
+make docker-logs        # view logs (Ctrl+C to exit)
+make docker-ps          # container status
+make docker-shell       # open bash in container
+
+# Cleanup
+make docker-clean       # remove all Docker resources
+```
+
+### Windows Batch Files
+```bash
+run.bat    # Build + start dashboard (opens browser)
+stop.bat   # Stop containers (with cleanup option)
 ```
 
 ## Metrics
