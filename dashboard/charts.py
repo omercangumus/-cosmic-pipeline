@@ -1,288 +1,197 @@
-"""Plotly visualization charts with dark theme for cosmic-pipeline dashboard."""
+""" AEGIS Dashboard — Chart Components
+Dark-themed Plotly figures for satellite telemetry visualization.
+"""
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Optional
+from plotly.subplots import make_subplots
 
+# ── Design tokens ─────────────────────────────────────
+BG_PAPER   = "#020408"
+BG_PLOT    = "#080d14"
+COLOR_CYAN = "#00d4ff"
+COLOR_AMBER= "#f59e0b"
+COLOR_RED  = "#ff3366"
+COLOR_GREEN= "#00ff88"
+COLOR_GRAY = "rgba(180,180,180,0.35)"
+GRID       = "rgba(100,200,255,0.07)"
+FONT       = dict(color="#e8f4ff", family="monospace")
 
-# Dark theme configuration
-DARK_THEME = dict(
-    paper_bgcolor="#020408",
-    plot_bgcolor="#080d14",
-    font=dict(color="#e8f4ff"),
-    xaxis=dict(
-        gridcolor="rgba(100,200,255,0.08)",
-        zerolinecolor="rgba(100,200,255,0.1)"
-    ),
-    yaxis=dict(
-        gridcolor="rgba(100,200,255,0.08)",
-        zerolinecolor="rgba(100,200,255,0.1)"
-    ),
+LAYOUT_BASE = dict(
+    paper_bgcolor=BG_PAPER,
+    plot_bgcolor=BG_PLOT,
+    font=FONT,
+    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID, color="#8bb8d4"),
+    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID, color="#8bb8d4"),
     legend=dict(
         bgcolor="rgba(0,0,0,0)",
-        bordercolor="rgba(100,200,255,0.2)",
+        bordercolor="rgba(100,200,255,0.15)",
         borderwidth=1
     ),
-    margin=dict(t=50, b=50, l=60, r=30)
+    margin=dict(t=50, b=50, l=60, r=30),
+    hovermode="x unified",
 )
 
 
 def plot_signal(
     df: pd.DataFrame,
-    anomaly_mask: Optional[np.ndarray] = None,
-    title: str = "Telemetry Signal",
-    color: str = "#00d4ff"
+    anomaly_mask: np.ndarray = None,
+    title: str = "Telemetri Sinyali",
+    color: str = COLOR_CYAN,
 ) -> go.Figure:
-    """
-    Plot single signal with optional anomaly overlay.
-    
-    Args:
-        df: DataFrame with columns [timestamp, value]
-        anomaly_mask: Boolean array marking anomalies
-        title: Plot title
-        color: Line color
-        
-    Returns:
-        Plotly Figure object
-    """
+    """Single signal line chart with optional anomaly overlay."""
     fig = go.Figure()
     
-    # Main signal line
     fig.add_trace(go.Scatter(
-        x=df["timestamp"],
+        x=df.index if "timestamp" not in df.columns else df["timestamp"],
         y=df["value"],
         mode="lines",
-        name="Signal",
-        line=dict(color=color, width=1.2),
+        name="Sinyal",
+        line=dict(color=color, width=1.5),
+        hovertemplate="<b>Değer:</b> %{y:.2f}<extra></extra>",
     ))
     
-    # Anomaly markers
     if anomaly_mask is not None and anomaly_mask.any():
-        flagged = df[anomaly_mask.astype(bool)]
+        anomaly_idx = np.where(anomaly_mask)[0]
         fig.add_trace(go.Scatter(
-            x=flagged["timestamp"],
-            y=flagged["value"],
+            x=df.index[anomaly_idx] if "timestamp" not in df.columns else df["timestamp"].iloc[anomaly_idx],
+            y=df["value"].iloc[anomaly_idx],
             mode="markers",
-            name="Anomaly",
-            marker=dict(
-                color="#ff3366",
-                size=6,
-                opacity=0.85,
-                symbol="circle",
-                line=dict(color="#ff0044", width=1)
-            )
+            name="Anomali",
+            marker=dict(color=COLOR_RED, size=6, symbol="x"),
+            hovertemplate="<b>Anomali:</b> %{y:.2f}<extra></extra>",
         ))
     
-    fig.update_layout(title=title, **DARK_THEME)
+    fig.update_layout(**LAYOUT_BASE, title=dict(text=title, x=0.5, xanchor="center"))
     return fig
 
 
 def plot_comparison(
-    df_original: pd.DataFrame,
-    df_classic: pd.DataFrame,
-    df_ml: pd.DataFrame,
-    classic_mask: Optional[np.ndarray] = None,
-    ml_mask: Optional[np.ndarray] = None
+    original: pd.DataFrame,
+    cleaned: pd.DataFrame,
+    title: str = "Orijinal vs Temizlenmiş",
 ) -> go.Figure:
-    """
-    Overlay original, classic-cleaned and ML-cleaned signals.
+    """Side-by-side comparison of original and cleaned signals."""
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=("Orijinal Sinyal", "Temizlenmiş Sinyal"),
+        vertical_spacing=0.12,
+    )
     
-    Args:
-        df_original: Original corrupted signal
-        df_classic: Classic DSP cleaned signal
-        df_ml: ML cleaned signal
-        classic_mask: Anomalies detected by classic methods
-        ml_mask: Anomalies detected by ML
-        
-    Returns:
-        Plotly Figure object
-    """
-    fig = go.Figure()
+    x_orig = original.index if "timestamp" not in original.columns else original["timestamp"]
+    x_clean = cleaned.index if "timestamp" not in cleaned.columns else cleaned["timestamp"]
     
-    # Original signal (faded)
-    fig.add_trace(go.Scatter(
-        x=df_original["timestamp"],
-        y=df_original["value"],
-        mode="lines",
-        name="Original",
-        line=dict(color="rgba(180,180,180,0.4)", width=1),
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=x_orig, y=original["value"],
+            mode="lines", name="Orijinal",
+            line=dict(color=COLOR_AMBER, width=1.2),
+        ),
+        row=1, col=1,
+    )
     
-    # Classic DSP cleaned
-    fig.add_trace(go.Scatter(
-        x=df_classic["timestamp"],
-        y=df_classic["value"],
-        mode="lines",
-        name="Classic DSP",
-        line=dict(color="#f59e0b", width=1.5),
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=x_clean, y=cleaned["value"],
+            mode="lines", name="Temizlenmiş",
+            line=dict(color=COLOR_GREEN, width=1.2),
+        ),
+        row=2, col=1,
+    )
     
-    # ML cleaned
-    fig.add_trace(go.Scatter(
-        x=df_ml["timestamp"],
-        y=df_ml["value"],
-        mode="lines",
-        name="ML (LSTM AE)",
-        line=dict(color="#00d4ff", width=1.5),
-    ))
-    
-    # Classic detection markers
-    if classic_mask is not None and classic_mask.any():
-        flagged = df_original[classic_mask.astype(bool)]
-        fig.add_trace(go.Scatter(
-            x=flagged["timestamp"],
-            y=flagged["value"],
-            mode="markers",
-            name="Classic Flagged",
-            marker=dict(color="#f59e0b", size=5, symbol="x", opacity=0.7)
-        ))
-    
-    # ML detection markers
-    if ml_mask is not None and ml_mask.any():
-        flagged = df_original[ml_mask.astype(bool)]
-        fig.add_trace(go.Scatter(
-            x=flagged["timestamp"],
-            y=flagged["value"],
-            mode="markers",
-            name="ML Flagged",
-            marker=dict(color="#00d4ff", size=5, symbol="x", opacity=0.7)
-        ))
-    
+    fig.update_xaxes(gridcolor=GRID, color="#8bb8d4")
+    fig.update_yaxes(gridcolor=GRID, color="#8bb8d4")
     fig.update_layout(
-        title="Signal Comparison: Original vs Cleaned",
-        **DARK_THEME
+        **LAYOUT_BASE,
+        title=dict(text=title, x=0.5, xanchor="center"),
+        showlegend=True,
+        height=600,
     )
     return fig
 
 
 def plot_metrics_bar(
-    metrics_classic: dict,
-    metrics_ml: dict
+    metrics: dict,
+    title: str = "Pipeline Metrikleri",
 ) -> go.Figure:
-    """
-    Grouped bar chart: Classic DSP vs ML metrics.
+    """Horizontal bar chart for pipeline metrics."""
+    labels = []
+    values = []
+    colors = []
     
-    Args:
-        metrics_classic: Dictionary with precision, recall, f1 keys
-        metrics_ml: Dictionary with precision, recall, f1 keys
-        
-    Returns:
-        Plotly Figure object
-    """
-    metrics_to_show = ["precision", "recall", "f1"]
-    labels = ["Spike Precision", "Drift Recall", "F1 Score"]
+    if "faults_detected" in metrics:
+        labels.append("Tespit Edilen Hata")
+        values.append(metrics["faults_detected"])
+        colors.append(COLOR_RED)
     
-    classic_vals = [metrics_classic.get(m, 0) * 100 for m in metrics_to_show]
-    ml_vals = [metrics_ml.get(m, 0) * 100 for m in metrics_to_show]
+    if "faults_corrected" in metrics:
+        labels.append("Düzeltilen Hata")
+        values.append(metrics["faults_corrected"])
+        colors.append(COLOR_GREEN)
     
-    fig = go.Figure()
+    if "processing_time" in metrics:
+        labels.append("İşlem Süresi (ms)")
+        values.append(metrics["processing_time"] * 1000)
+        colors.append(COLOR_CYAN)
     
-    fig.add_trace(go.Bar(
-        name="Classic DSP",
-        x=labels,
-        y=classic_vals,
-        marker_color="#f59e0b",
-        text=[f"{v:.1f}%" for v in classic_vals],
-        textposition="outside"
+    fig = go.Figure(go.Bar(
+        x=values,
+        y=labels,
+        orientation="h",
+        marker=dict(color=colors),
+        text=[f"{v:.1f}" for v in values],
+        textposition="outside",
+        hovertemplate="<b>%{y}:</b> %{x:.2f}<extra></extra>",
     ))
-    
-    fig.add_trace(go.Bar(
-        name="ML (LSTM AE)",
-        x=labels,
-        y=ml_vals,
-        marker_color="#00d4ff",
-        text=[f"{v:.1f}%" for v in ml_vals],
-        textposition="outside"
-    ))
-    
-    theme_copy = DARK_THEME.copy()
-    theme_copy["yaxis"] = dict(
-        range=[0, 115],
-        ticksuffix="%",
-        gridcolor="rgba(100,200,255,0.08)"
-    )
     
     fig.update_layout(
-        barmode="group",
-        title="Classic DSP vs ML Performance",
-        **theme_copy
+        **LAYOUT_BASE,
+        title=dict(text=title, x=0.5, xanchor="center"),
+        xaxis_title="Değer",
+        height=300,
     )
     return fig
 
 
 def plot_anomaly_timeline(
-    n_points: int,
-    ground_truth_mask: dict,
-    pred_mask: np.ndarray
+    fault_timeline: pd.DataFrame,
+    title: str = "Anomali Zaman Çizelgesi",
 ) -> go.Figure:
-    """
-    Horizontal timeline: ground truth fault regions vs ensemble detections.
+    """Scatter plot showing fault types over time with severity coloring."""
+    if fault_timeline.empty:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Anomali tespit edilmedi",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color=COLOR_GRAY),
+        )
+        fig.update_layout(**LAYOUT_BASE, title=dict(text=title, x=0.5, xanchor="center"))
+        return fig
     
-    Args:
-        n_points: Total number of signal points
-        ground_truth_mask: Dict with keys: seu, tid, gap, noise
-        pred_mask: Boolean array of ensemble predictions
-        
-    Returns:
-        Plotly Figure object
-    """
     fig = go.Figure()
-    x_axis = list(range(n_points))
     
-    fault_config = [
-        ("seu", "#ff3366", "GT: SEU"),
-        ("tid", "#f59e0b", "GT: TID Drift"),
-        ("gap", "#a78bfa", "GT: Data Gap"),
-        ("noise", "#00d4ff", "GT: Noise"),
-    ]
-    
-    for fault_key, color, label in fault_config:
-        indices = ground_truth_mask.get(fault_key, [])
-        if not indices:
-            continue
-        
-        mask = np.zeros(n_points, dtype=bool)
-        
-        if fault_key == "gap":
-            for start, end in indices:
-                mask[start:end] = True
-        else:
-            valid = [i for i in indices if i < n_points]
-            if valid:
-                mask[np.array(valid)] = True
-        
-        colors = [color if m else "rgba(0,0,0,0)" for m in mask]
-        
-        fig.add_trace(go.Scatter(
-            x=x_axis,
-            y=[label] * n_points,
-            mode="markers",
-            marker=dict(color=colors, size=5, symbol="square"),
-            name=label,
-            showlegend=True
-        ))
-    
-    # Ensemble prediction
-    pred_colors = ["#00ff88" if m else "rgba(0,0,0,0)" for m in pred_mask]
     fig.add_trace(go.Scatter(
-        x=x_axis,
-        y=["Ensemble Detected"] * n_points,
+        x=fault_timeline["timestamp"],
+        y=fault_timeline["fault_type"],
         mode="markers",
-        marker=dict(color=pred_colors, size=5, symbol="square"),
-        name="Ensemble Detected",
-        showlegend=True
+        marker=dict(
+            size=10,
+            color=fault_timeline["severity"],
+            colorscale=[[0, COLOR_AMBER], [1, COLOR_RED]],
+            showscale=True,
+            colorbar=dict(title="Şiddet", x=1.02),
+            line=dict(width=1, color="rgba(255,255,255,0.3)"),
+        ),
+        hovertemplate="<b>Tip:</b> %{y}<br><b>Şiddet:</b> %{marker.color:.2f}<extra></extra>",
     ))
     
     fig.update_layout(
-        title="Anomaly Detection Timeline",
-        height=280,
-        paper_bgcolor="#020408",
-        plot_bgcolor="#080d14",
-        font=dict(color="#e8f4ff"),
-        xaxis=dict(title="Sample Index", gridcolor="rgba(100,200,255,0.05)"),
-        yaxis=dict(gridcolor="rgba(0,0,0,0)"),
-        legend=dict(bgcolor="rgba(0,0,0,0)"),
-        margin=dict(t=40, b=40, l=140, r=30)
+        **LAYOUT_BASE,
+        title=dict(text=title, x=0.5, xanchor="center"),
+        xaxis_title="Zaman",
+        yaxis_title="Hata Tipi",
+        height=400,
     )
     return fig
