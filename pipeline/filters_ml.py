@@ -44,6 +44,8 @@ def reconstruct_with_lstm(
     cfg = checkpoint["config"]
     ws = cfg["window_size"]
 
+    from pipeline.filters_classic import detrend_signal
+
     out = df.copy()
     values = out["value"].values.astype(np.float64)
 
@@ -51,8 +53,12 @@ def reconstruct_with_lstm(
         logger.warning("Signal too short for LSTM reconstruction, using interpolation")
         return _fallback_interpolation(df, mask)
 
+    # Detrend before LSTM: remove linear drift so the model sees stationary data
+    df_detrended = detrend_signal(out)
+    values_dt = df_detrended["value"].values.astype(np.float64)
+
     # Normalize
-    values_clean = values.copy()
+    values_clean = values_dt.copy()
     # Replace anomalous points with local median before feeding to LSTM
     mask_arr = mask.values.astype(bool)
     values_clean[mask_arr] = np.nan
@@ -83,7 +89,8 @@ def reconstruct_with_lstm(
     reconstructed = reconstructed * norm["std"] + norm["mean"]
 
     # Replace only masked points, with blending at boundaries
-    result = values.copy()
+    # Work on detrended values — drift (TID) is removed intentionally
+    result = values_dt.copy()
     if blend_window > 0:
         result = _blend_replace(result, reconstructed, mask_arr, blend_window)
     else:

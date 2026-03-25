@@ -166,31 +166,39 @@ def detect_gaps(
 
 def detect_all(
     df: pd.DataFrame,
-    zscore_threshold: float = 3.0,
+    zscore_threshold: float = 2.0,
     iqr_multiplier: float = 1.5,
     window: int = 50,
     window_threshold: float = 3.0,
     max_gap_seconds: int = 60,
+    df_original: pd.DataFrame | None = None,
 ) -> dict[str, pd.Series]:
     """
     Run all classic detectors and return individual masks.
 
+    Expects pre-detrended data in *df* for statistical detectors.
+    Gap detection runs on *df_original* (or *df* if not provided)
+    so that NaN positions are preserved.
+
     Args:
-        df: DataFrame with 'timestamp' and 'value' columns.
+        df: DataFrame with 'timestamp' and 'value' columns (detrended).
         zscore_threshold: Z-score threshold.
         iqr_multiplier: IQR multiplier.
         window: Sliding window size.
         window_threshold: Sliding window deviation threshold.
         max_gap_seconds: Maximum allowed timestamp gap.
+        df_original: Original (non-detrended) DataFrame for gap detection.
 
     Returns:
         Dict of detector_name → boolean mask.
     """
+    gap_source = df_original if df_original is not None else df
+
     results = {
         "zscore": detect_outliers_zscore(df, threshold=zscore_threshold),
         "iqr": detect_outliers_iqr(df, multiplier=iqr_multiplier),
         "sliding_window": detect_sliding_window(df, window=window, threshold=window_threshold),
-        "gaps": detect_gaps(df, max_gap_seconds=max_gap_seconds),
+        "gaps": detect_gaps(gap_source, max_gap_seconds=max_gap_seconds),
     }
 
     total = sum(m.sum() for m in results.values())

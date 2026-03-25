@@ -58,6 +58,10 @@ def run_pipeline(
     validate_schema(data)
     data = preprocess(data)
 
+    # --- 1b. Detrend for detection (does NOT modify `data`) ---
+    from pipeline.filters_classic import detrend_signal
+    data_detrended = detrend_signal(data)
+
     # --- 2. Detection ---
     logger.info("Step 2: Anomaly detection (method=%s)", method)
     detector_masks: dict[str, pd.Series] = {}
@@ -65,12 +69,13 @@ def run_pipeline(
     if method in ("classic", "both"):
         dsp_cfg = config.get("dsp_detector", {})
         classic_masks = detect_classic(
-            data,
-            zscore_threshold=dsp_cfg.get("zscore_threshold", 3.5),
+            data_detrended,
+            zscore_threshold=dsp_cfg.get("zscore_threshold", 2.0),
             iqr_multiplier=dsp_cfg.get("iqr_multiplier", 1.5),
             window=dsp_cfg.get("window", 50),
             window_threshold=dsp_cfg.get("window_threshold", 3.0),
             max_gap_seconds=dsp_cfg.get("max_gap_seconds", 60),
+            df_original=data,
         )
         detector_masks.update(classic_masks)
 
@@ -79,7 +84,7 @@ def run_pipeline(
 
         ml_cfg = config.get("lstm_detector", {})
         ml_masks = detect_all_ml(
-            data,
+            data_detrended,
             model_path=ml_cfg.get("model_path", "models/lstm_ae.pt"),
             contamination=config.get("dsp_detector", {}).get("iforest_contamination", 0.05),
             threshold_percentile=ml_cfg.get("threshold_percentile", 95.0),
@@ -90,10 +95,17 @@ def run_pipeline(
     logger.info("Step 3: Ensemble voting (%d detectors)", len(detector_masks))
     ens_cfg = config.get("ensemble", {})
     mask_list = list(detector_masks.values())
+
+    # All modes use "any" (min_agreement=1): each detector specializes in
+    # a different fault type (zscore→spikes, gaps→NaN, sliding→local),
+    # so requiring overlap loses valid detections.
+    default_strategy = "any"
+    default_min = 1
+
     fault_mask = ensemble_vote(
         mask_list,
-        strategy="majority",
-        min_agreement=ens_cfg.get("min_agreement"),
+        strategy=ens_cfg.get("strategy", default_strategy),
+        min_agreement=ens_cfg.get("min_agreement", default_min),
     )
 
     # --- 4. Filtering ---

@@ -48,6 +48,11 @@ def _flip_bits(value: float, n_bits: int, rng: np.random.Generator) -> float:
         sign = 1.0 if rng.random() > 0.5 else -1.0
         return abs(value) * rng.uniform(10, 100) * sign
 
+    # Clamp: keep result within ±100x of original magnitude
+    magnitude = max(abs(value), 1e-6)
+    limit = magnitude * 100.0
+    result = float(np.clip(result, -limit, limit))
+
     return result
 
 

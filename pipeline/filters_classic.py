@@ -1,12 +1,45 @@
-"""Classic signal filters: median, Savitzky-Golay, wavelet denoising, interpolation."""
+"""Classic signal filters: median, Savitzky-Golay, wavelet denoising, detrend, interpolation."""
 
 import logging
 
 import numpy as np
 import pandas as pd
+from scipy.signal import detrend as _scipy_detrend
 from scipy.signal import savgol_filter as _savgol
 
 logger = logging.getLogger(__name__)
+
+
+def detrend_signal(
+    df: pd.DataFrame,
+    type: str = "linear",
+) -> pd.DataFrame:
+    """
+    Remove linear or polynomial trend from the signal.
+
+    NaN values are preserved — only finite spans are detrended.
+
+    Args:
+        df: DataFrame with a 'value' column.
+        type: 'linear' or 'constant' (passed to scipy.signal.detrend).
+
+    Returns:
+        New DataFrame with trend removed.
+    """
+    out = df.copy()
+    values = out["value"].values.astype(np.float64)
+
+    finite = np.isfinite(values)
+    if finite.sum() < 2:
+        return out
+
+    # Detrend only finite values, leave NaN positions untouched
+    detrended = values.copy()
+    detrended[finite] = _scipy_detrend(values[finite], type=type)
+
+    out["value"] = detrended
+    logger.info("Detrend (%s): removed trend from %d finite points", type, finite.sum())
+    return out
 
 
 def median_filter(
@@ -220,11 +253,14 @@ def apply_classic_filters(
     # Step 1: fill gaps
     result = interpolate_gaps(df, gap_mask)
 
-    # Step 2: median filter on spikes
+    # Step 2: remove trend (drift)
+    result = detrend_signal(result)
+
+    # Step 3: median filter on spikes
     if spike_mask.any():
         result = median_filter(result, spike_mask, window=median_window)
 
-    # Step 3: smooth remaining flagged areas
+    # Step 4: smooth remaining flagged areas
     if spike_mask.any():
         result = savgol_filter(result, spike_mask, window=sg_window, polyorder=sg_polyorder)
 
