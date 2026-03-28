@@ -6,6 +6,7 @@ import pytest
 
 from pipeline.detector_classic import (
     detect_all,
+    detect_delta_spike,
     detect_gaps,
     detect_outliers_zscore,
     detect_range_violation,
@@ -98,6 +99,32 @@ def test_range_returns_bool_series(normal_df):
     assert mask.dtype == bool
 
 
+# --- Delta Spike ---
+
+def test_delta_detects_sudden_jump():
+    n = 200
+    values = np.ones(n) * 10.0
+    values[100] = 500.0  # sudden jump
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_delta_spike(df)
+    assert mask.iloc[100]  # jump point
+    assert mask.iloc[101]  # return point
+
+
+def test_delta_clean_signal_no_flags():
+    n = 200
+    values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_delta_spike(df, max_delta_multiplier=10.0)
+    assert mask.sum() == 0
+
+
 # --- Sliding Window ---
 
 def test_sliding_window_detects_local_spike():
@@ -138,7 +165,7 @@ def test_gaps_no_false_positives(normal_df):
 
 def test_detect_all_returns_all_detectors(normal_df):
     results = detect_all(normal_df)
-    assert set(results.keys()) == {"zscore", "sliding_window", "gaps", "range"}
+    assert set(results.keys()) == {"zscore", "sliding_window", "gaps", "range", "delta"}
     for name, mask in results.items():
         assert isinstance(mask, pd.Series), f"{name} is not a Series"
         assert mask.dtype == bool, f"{name} is not bool dtype"

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 VALID_METHODS = ("classic", "ml", "both")
 
 # Detectors whose output is treated as "hard" (any-True → anomaly)
-HARD_DETECTORS = {"gaps", "range"}
+HARD_DETECTORS = {"gaps", "range", "delta"}
 
 
 def run_pipeline(
@@ -83,6 +83,7 @@ def run_pipeline(
             window_threshold=dsp_cfg.get("window_threshold", 3.0),
             max_gap_seconds=dsp_cfg.get("max_gap_seconds", 60),
             range_std_multiplier=dsp_cfg.get("range_std_multiplier", 10.0),
+            delta_multiplier=dsp_cfg.get("delta_multiplier", 5.0),
             df_original=data,
         )
         detector_masks.update(classic_masks)
@@ -119,6 +120,24 @@ def run_pipeline(
             soft_masks,
             min_agreement=ens_cfg.get("min_agreement", 2),
         )
+
+    # Log pyramid layers
+    _empty = pd.Series(dtype=bool)
+    layer1_count = sum(
+        int(detector_masks.get(k, _empty).sum())
+        for k in ["gaps", "range", "delta"] if k in detector_masks
+    )
+    layer2_count = (
+        int(detector_masks.get("zscore", _empty).sum())
+        + int(detector_masks.get("sliding_window", _empty).sum())
+    )
+    layer3_count = int(detector_masks.get("isolation_forest", _empty).sum()) if "isolation_forest" in detector_masks else 0
+    layer4_count = int(detector_masks.get("lstm_ae", _empty).sum()) if "lstm_ae" in detector_masks else 0
+
+    logger.info(
+        "Pyramid detection — L1(hard): %d, L2(statistical): %d, L3(ML): %d, L4(temporal): %d",
+        layer1_count, layer2_count, layer3_count, layer4_count,
+    )
 
     # --- 5. Filtering ---
     logger.info("Step 4: Filtering (method=%s)", method)
@@ -170,7 +189,7 @@ def _build_fault_timeline(
         combined_mask: Ensemble-voted mask.
 
     Returns:
-        DataFrame with columns [timestamp, fault_type, severity].
+        DataFrame with columns [timestamp, fault_type, severity, reason].
     """
     rows: list[dict] = []
     fault_indices = combined_mask[combined_mask].index
@@ -181,10 +200,22 @@ def _build_fault_timeline(
         severity = len(types) / max(len(detector_masks), 1)
         ts = data["timestamp"].iloc[idx] if "timestamp" in data.columns else idx
 
+        if any(t in ("gaps", "range", "delta") for t in types):
+            reason = "hard_rule"
+        elif any(t in ("zscore", "sliding_window") for t in types):
+            reason = "statistical"
+        elif any(t == "isolation_forest" for t in types):
+            reason = "ml_outlier"
+        elif any(t == "lstm_ae" for t in types):
+            reason = "temporal_pattern"
+        else:
+            reason = "unknown"
+
         rows.append({
             "timestamp": ts,
             "fault_type": fault_type,
             "severity": round(severity, 2),
+            "reason": reason,
         })
 
-    return pd.DataFrame(rows, columns=["timestamp", "fault_type", "severity"])
+    return pd.DataFrame(rows, columns=["timestamp", "fault_type", "severity", "reason"])

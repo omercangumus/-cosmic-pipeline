@@ -80,7 +80,7 @@ def test_pipeline_fault_timeline_structure(synthetic_data):
 
     ft = result["fault_timeline"]
     assert isinstance(ft, pd.DataFrame)
-    assert list(ft.columns) == ["timestamp", "fault_type", "severity"]
+    assert list(ft.columns) == ["timestamp", "fault_type", "severity", "reason"]
     assert len(ft) == result["metrics"]["faults_detected"]
     assert (ft["severity"] >= 0).all() and (ft["severity"] <= 1).all()
 

@@ -126,6 +126,41 @@ def detect_sliding_window(
     return pd.Series(mask, index=df.index)
 
 
+def detect_delta_spike(
+    df: pd.DataFrame, max_delta_multiplier: float = 5.0
+) -> pd.Series:
+    """
+    Detect sudden jumps relative to the previous value.
+
+    Flags points where the absolute difference from the prior sample
+    exceeds mean(delta) + max_delta_multiplier * std(delta).
+
+    Args:
+        df: DataFrame with a 'value' column.
+        max_delta_multiplier: Threshold multiplier on delta statistics.
+
+    Returns:
+        Boolean Series (True = sudden jump detected).
+    """
+    values = df["value"].values.astype(np.float64)
+    delta = np.abs(np.diff(values, prepend=values[0]))
+    finite_delta = delta[np.isfinite(delta)]
+
+    if len(finite_delta) < 2:
+        return pd.Series(np.zeros(len(values), dtype=bool), index=df.index)
+
+    threshold = np.nanmean(finite_delta) + max_delta_multiplier * np.nanstd(finite_delta)
+    mask = delta > threshold
+    mask[~np.isfinite(values)] = False
+
+    n_detected = mask.sum()
+    logger.info(
+        "Delta spike (%d*std): %d anomalies detected",
+        max_delta_multiplier, n_detected,
+    )
+    return pd.Series(mask, index=df.index)
+
+
 def detect_gaps(
     df: pd.DataFrame, max_gap_seconds: int = 60
 ) -> pd.Series:
@@ -162,6 +197,7 @@ def detect_all(
     window_threshold: float = 3.0,
     max_gap_seconds: int = 60,
     range_std_multiplier: float = 10.0,
+    delta_multiplier: float = 5.0,
     df_original: pd.DataFrame | None = None,
     **kwargs,
 ) -> dict[str, pd.Series]:
@@ -169,8 +205,8 @@ def detect_all(
     Run all classic detectors and return individual masks.
 
     Expects pre-detrended data in *df* for statistical detectors.
-    Gap and range detection runs on *df_original* (or *df* if not provided)
-    so that NaN positions and original scale are preserved.
+    Gap, range, and delta detection runs on *df_original* (or *df* if
+    not provided) so that NaN positions and original scale are preserved.
 
     Args:
         df: DataFrame with 'timestamp' and 'value' columns (detrended).
@@ -179,7 +215,8 @@ def detect_all(
         window_threshold: Sliding window deviation threshold.
         max_gap_seconds: Maximum allowed timestamp gap.
         range_std_multiplier: Multiplier for range violation detection.
-        df_original: Original (non-detrended) DataFrame for gap/range detection.
+        delta_multiplier: Multiplier for delta spike detection.
+        df_original: Original (non-detrended) DataFrame for gap/range/delta.
 
     Returns:
         Dict of detector_name → boolean mask.
@@ -191,6 +228,7 @@ def detect_all(
         "sliding_window": detect_sliding_window(df, window=window, threshold=window_threshold),
         "gaps": detect_gaps(gap_source, max_gap_seconds=max_gap_seconds),
         "range": detect_range_violation(gap_source, max_std_multiplier=range_std_multiplier),
+        "delta": detect_delta_spike(gap_source, max_delta_multiplier=delta_multiplier),
     }
 
     total = sum(m.sum() for m in results.values())
