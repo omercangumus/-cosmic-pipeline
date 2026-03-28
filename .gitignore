@@ -21,3 +21,5 @@ logs/
 goes_data/
 .kiro/
 *.pt.bak
+.claude/
+.vscode/
