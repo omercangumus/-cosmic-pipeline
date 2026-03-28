@@ -1,5 +1,6 @@
 """Gradio dashboard for the Cosmic Signal Processing Pipeline."""
 
+import base64
 import sys
 from pathlib import Path
 
@@ -160,9 +161,10 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                     )
                     game_result = gr.HTML(label="Sonuc")
 
-            _game_abs = str(Path(__file__).parent / "game.html")
+            _game_path = Path(__file__).parent / "game.html"
+            _game_b64 = base64.b64encode(_game_path.read_bytes()).decode()
             gr.HTML(
-                value=f'<iframe src="/file={_game_abs}" width="100%" height="600" style="border:none; border-radius:12px;"></iframe>',
+                value=f'<iframe src="data:text/html;base64,{_game_b64}" width="100%" height="600" style="border:none; border-radius:12px; background:#0a0e17;"></iframe>',
             )
 
             btn_game.click(
@@ -173,9 +175,4 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
 
 if __name__ == "__main__":
-    app.launch(
-        server_port=7860,
-        share=False,
-        theme=theme,
-        allowed_paths=[str(Path(__file__).parent / "game.html")],
-    )
+    app.launch(server_port=7860, share=False, theme=theme)
