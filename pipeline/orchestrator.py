@@ -10,6 +10,7 @@ from pipeline.detector_classic import detect_all as detect_classic
 from pipeline.ensemble import hybrid_majority_vote
 from pipeline.filters_classic import apply_classic_filters
 from pipeline.ingestion import load_data, preprocess, validate_schema
+from pipeline.tracer import PipelineTracer
 from pipeline.validator import calculate_metrics, validate_output
 
 logger = logging.getLogger(__name__)
@@ -52,12 +53,14 @@ def run_pipeline(
         config = {}
 
     t_start = time.perf_counter()
+    tracer = PipelineTracer()
 
     # --- 1. Ingestion ---
     logger.info("Step 1: Ingestion")
     data = load_data(df)
     validate_schema(data)
     data = preprocess(data)
+    tracer.snapshot("Veri Alimi", "Yukleme, sema kontrolu, on isleme", df, data)
 
     # Sampling rate validation
     from pipeline.validator import validate_sampling_rate
@@ -69,6 +72,7 @@ def run_pipeline(
     from pipeline.filters_classic import detrend_signal
 
     data_detrended = detrend_signal(data)
+    tracer.snapshot("Trend Kaldirma", "Lineer trend (TID drift) cikarildi", data, data_detrended)
 
     # --- 3. Detection ---
     logger.info("Step 2: Anomaly detection (method=%s)", method)
@@ -87,6 +91,11 @@ def run_pipeline(
             df_original=data,
         )
         detector_masks.update(classic_masks)
+        for det_name, det_mask in classic_masks.items():
+            tracer.snapshot_detection(
+                f"Detektor: {det_name}", f"{det_name} anomali taramasi",
+                det_mask, data, detector_name=det_name,
+            )
 
     if method in ("ml", "both"):
         from pipeline.detector_ml import detect_all_ml
@@ -99,6 +108,11 @@ def run_pipeline(
             threshold_percentile=ml_cfg.get("threshold_percentile", 95.0),
         )
         detector_masks.update(ml_masks)
+        for det_name, det_mask in ml_masks.items():
+            tracer.snapshot_detection(
+                f"Detektor: {det_name}", f"{det_name} ML anomali taramasi",
+                det_mask, data, detector_name=det_name,
+            )
 
     # --- 4. Hybrid Majority Ensemble ---
     logger.info("Step 3: Hybrid ensemble voting (%d detectors)", len(detector_masks))
@@ -139,6 +153,12 @@ def run_pipeline(
         layer1_count, layer2_count, layer3_count, layer4_count,
     )
 
+    _soft_only = max(0, int(fault_mask.sum()) - layer1_count)
+    tracer.snapshot_ensemble(
+        hard_count=layer1_count, soft_count=_soft_only,
+        total_count=int(fault_mask.sum()),
+    )
+
     # --- 5. Filtering ---
     logger.info("Step 4: Filtering (method=%s)", method)
     flt_cfg = config.get("classic_filter", {})
@@ -148,9 +168,12 @@ def run_pipeline(
         median_window=flt_cfg.get("median_window", 5),
     )
 
+    tracer.snapshot("Filtreleme", "Interpolation -> Detrend -> Median (mercek modeli)", data, cleaned_data)
+
     # --- 6. Validation ---
     logger.info("Step 5: Validation")
     validate_output(cleaned_data)
+    tracer.snapshot("Dogrulama", "Temizlenmis sinyal kalite kontrolu", cleaned_data, cleaned_data)
 
     processing_time = time.perf_counter() - t_start
     faults_detected = int(fault_mask.sum())
@@ -188,6 +211,8 @@ def run_pipeline(
         "repair_confidence": repair_confidence,
         "repair_verification": repair_verification,
         "sampling_info": sampling_info,
+        "tracer_table": tracer.to_dataframe(),
+        "tracer_summary": tracer.to_summary(),
     }
 
 

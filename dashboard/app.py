@@ -383,7 +383,11 @@ def run_pipeline_ui(method):
     else:
         rv_text = "Sorun var: " + ", ".join(rv.get("issues", []))
 
-    return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text
+    # Tracer outputs
+    tracer_table = result.get("tracer_table", pd.DataFrame())
+    tracer_summary = result.get("tracer_summary", "")
+
+    return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
 
 
 # ── Gradio UI ──────────────────────────────────────────────────────────────────
@@ -487,10 +491,14 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                         label="Onarim Dogrulama", interactive=False, lines=3,
                     )
 
+                with gr.Tab("🔬 Adim Adim Izleme"):
+                    tbl_tracer = gr.Dataframe(label="Pipeline Adim Tablosu", max_height=500)
+                    code_tracer = gr.Code(label="Ozet Rapor", language=None, lines=25)
+
             btn_run.click(
                 fn=run_pipeline_ui,
                 inputs=[radio_method],
-                outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify],
+                outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
             )
 
 
