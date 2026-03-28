@@ -56,6 +56,34 @@ def parse_uploaded_csv(
             elif filename_lower.endswith(".tsv"):
                 df = pd.read_csv(io.BytesIO(decoded), sep="\t")
 
+            elif filename_lower.endswith((".h5", ".hdf5")):
+                try:
+                    import h5py
+                except ImportError:
+                    return None, "HDF5 destegi icin h5py yukleyin: pip install h5py"
+                import tempfile, os
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".h5")
+                try:
+                    tmp.write(decoded)
+                    tmp.close()
+                    with h5py.File(tmp.name, "r") as f:
+                        keys = list(f.keys())
+                        if not keys:
+                            return None, "HDF5 dosyasinda dataset bulunamadi"
+                        ds = f[keys[0]]
+                        if hasattr(ds, "shape") and len(ds.shape) <= 2:
+                            df = pd.DataFrame(ds[()])
+                        else:
+                            return None, f"HDF5 dataset boyutu desteklenmiyor: {ds.shape}"
+                finally:
+                    os.unlink(tmp.name)
+
+            elif filename_lower.endswith(".parquet"):
+                try:
+                    df = pd.read_parquet(io.BytesIO(decoded))
+                except ImportError:
+                    return None, "Parquet destegi icin pyarrow yukleyin: pip install pyarrow"
+
             else:
                 # CSV with auto-delimiter detection
                 try:

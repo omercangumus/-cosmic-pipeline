@@ -637,7 +637,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
                     gr.Markdown("---")
                     gr.Markdown("### CSV Yukle")
-                    csv_file = gr.File(label="CSV/TSV/Excel/JSON", file_types=[".csv", ".tsv", ".xlsx", ".xls", ".json"])
+                    csv_file = gr.File(label="CSV/TSV/Excel/JSON/HDF5/Parquet", file_types=[".csv", ".tsv", ".xlsx", ".xls", ".json", ".h5", ".hdf5", ".parquet"])
                     btn_csv = gr.Button("📁 CSV Yukle")
                     chk_columns = gr.CheckboxGroup(
                         choices=[], value=[], visible=False,

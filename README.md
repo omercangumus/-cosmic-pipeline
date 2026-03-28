@@ -91,13 +91,12 @@ cosmic_pipeline/
 ## Current Limitations
 
 - **No real-time streaming**: Batch processing only.
-- **No HDF5/Parquet support**: CSV, TSV, Excel, JSON, netCDF4 supported.
 
 ## Roadmap
 
 - [x] **Multi-channel pipeline**: Process all numeric columns independently — per-channel detection and filtering
+- [x] **HDF5/Parquet format support**: Optional (`pip install h5py pyarrow`)
 - [ ] Real-time streaming support
-- [ ] HDF5/Parquet format support
 - [ ] Adaptive threshold tuning per sensor type
 
 ## License
