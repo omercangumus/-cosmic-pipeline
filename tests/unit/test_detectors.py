@@ -6,9 +6,10 @@ import pytest
 
 from pipeline.detector_classic import (
     detect_all,
+    detect_delta_spike,
     detect_gaps,
-    detect_outliers_iqr,
     detect_outliers_zscore,
+    detect_range_violation,
     detect_sliding_window,
 )
 
@@ -73,25 +74,55 @@ def test_zscore_nan_not_flagged():
     assert not mask.iloc[2]
 
 
-# --- IQR ---
+# --- Range Violation ---
 
-def test_iqr_detects_spikes(spiked_df):
-    df, spike_indices = spiked_df
-    mask = detect_outliers_iqr(df)
-    for idx in spike_indices:
-        assert mask.iloc[idx], f"Spike at {idx} not detected by IQR"
+def test_range_detects_extreme_spike():
+    n = 500
+    values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+    values[100] = 5000.0  # way beyond 10*std
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_range_violation(df, max_std_multiplier=10.0)
+    assert mask.iloc[100]
 
 
-def test_iqr_clean_signal_few_flags(normal_df):
-    mask = detect_outliers_iqr(normal_df)
-    assert mask.sum() < len(normal_df) * 0.1
+def test_range_clean_signal_no_flags(normal_df):
+    mask = detect_range_violation(normal_df)
+    assert mask.sum() == 0
 
 
-def test_iqr_strict_multiplier_catches_more(spiked_df):
-    df, _ = spiked_df
-    loose = detect_outliers_iqr(df, multiplier=3.0)
-    strict = detect_outliers_iqr(df, multiplier=1.0)
-    assert strict.sum() >= loose.sum()
+def test_range_returns_bool_series(normal_df):
+    mask = detect_range_violation(normal_df)
+    assert isinstance(mask, pd.Series)
+    assert mask.dtype == bool
+
+
+# --- Delta Spike ---
+
+def test_delta_detects_sudden_jump():
+    n = 200
+    values = np.ones(n) * 10.0
+    values[100] = 500.0  # sudden jump
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_delta_spike(df)
+    assert mask.iloc[100]  # jump point
+    assert mask.iloc[101]  # return point
+
+
+def test_delta_clean_signal_no_flags():
+    n = 200
+    values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_delta_spike(df, max_delta_multiplier=10.0)
+    assert mask.sum() == 0
 
 
 # --- Sliding Window ---
@@ -134,7 +165,7 @@ def test_gaps_no_false_positives(normal_df):
 
 def test_detect_all_returns_all_detectors(normal_df):
     results = detect_all(normal_df)
-    assert set(results.keys()) == {"zscore", "iqr", "sliding_window", "gaps"}
+    assert set(results.keys()) == {"zscore", "sliding_window", "gaps", "range", "delta"}
     for name, mask in results.items():
         assert isinstance(mask, pd.Series), f"{name} is not a Series"
         assert mask.dtype == bool, f"{name} is not bool dtype"
@@ -143,6 +174,6 @@ def test_detect_all_returns_all_detectors(normal_df):
 def test_detect_all_finds_spikes(spiked_df):
     df, spike_indices = spiked_df
     results = detect_all(df)
-    combined = results["zscore"] | results["iqr"]
+    combined = results["zscore"] | results["range"]
     for idx in spike_indices:
         assert combined.iloc[idx], f"Spike at {idx} not detected by any method"

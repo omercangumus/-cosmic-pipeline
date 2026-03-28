@@ -1,66 +1,71 @@
-"""Configuration dataclasses and utilities."""
+"""Configuration dataclasses for the cosmic pipeline."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
 @dataclass
 class DetectorConfig:
     """Configuration for anomaly detectors."""
-    zscore_threshold: float = 3.0
-    iqr_multiplier: float = 1.5
+    zscore_threshold: float = 2.0
     gap_threshold_seconds: int = 60
     sliding_window_size: int = 50
     sliding_window_threshold: float = 3.0
+    range_std_multiplier: float = 10.0
 
 
 @dataclass
 class MLConfig:
     """Configuration for ML models."""
     model_path: str = "models/lstm_ae.pt"
-    reconstruction_threshold: float = 0.1
-    isolation_forest_contamination: float = 0.1
+    contamination: float = 0.05
+    threshold_percentile: float = 95.0
 
 
 @dataclass
 class EnsembleConfig:
     """Configuration for ensemble voting."""
-    strategy: str = "majority"  # majority, any, all, weighted
-    min_agreement: Optional[int] = None
+    strategy: str = "hybrid"
+    min_agreement: int = 2
 
 
 @dataclass
 class FilterConfig:
     """Configuration for signal filters."""
     median_window: int = 5
-    interpolation_method: str = "linear"
-    savgol_window: int = 11
-    savgol_polyorder: int = 3
-    wavelet: str = "db4"
-    wavelet_level: int = 3
 
 
 @dataclass
 class PipelineConfig:
     """Complete pipeline configuration."""
-    detectors: DetectorConfig
-    ml: MLConfig
-    ensemble: EnsembleConfig
-    filters: FilterConfig
-    
+    detectors: DetectorConfig = field(default_factory=DetectorConfig)
+    ml: MLConfig = field(default_factory=MLConfig)
+    ensemble: EnsembleConfig = field(default_factory=EnsembleConfig)
+    filters: FilterConfig = field(default_factory=FilterConfig)
+
     @classmethod
-    def from_dict(cls, config_dict: dict) -> 'PipelineConfig':
-        """Create PipelineConfig from dictionary."""
-        pipeline_cfg = config_dict.get('pipeline', {})
-        
-        detectors_cfg = pipeline_cfg.get('detectors', {}).get('classic', {})
-        ml_cfg = pipeline_cfg.get('detectors', {}).get('ml', {})
-        ensemble_cfg = pipeline_cfg.get('ensemble', {})
-        filters_cfg = pipeline_cfg.get('filters', {}).get('classic', {})
-        
+    def from_dict(cls, config_dict: dict) -> "PipelineConfig":
+        """Create PipelineConfig from a flat or nested dictionary."""
+        det_cfg = config_dict.get("dsp_detector", {})
+        ml_cfg = config_dict.get("lstm_detector", {})
+        ens_cfg = config_dict.get("ensemble", {})
+        flt_cfg = config_dict.get("classic_filter", {})
+
         return cls(
-            detectors=DetectorConfig(**detectors_cfg),
-            ml=MLConfig(**ml_cfg),
-            ensemble=EnsembleConfig(**ensemble_cfg),
-            filters=FilterConfig(**filters_cfg)
+            detectors=DetectorConfig(**{
+                k: v for k, v in det_cfg.items()
+                if k in DetectorConfig.__dataclass_fields__
+            }),
+            ml=MLConfig(**{
+                k: v for k, v in ml_cfg.items()
+                if k in MLConfig.__dataclass_fields__
+            }),
+            ensemble=EnsembleConfig(**{
+                k: v for k, v in ens_cfg.items()
+                if k in EnsembleConfig.__dataclass_fields__
+            }),
+            filters=FilterConfig(**{
+                k: v for k, v in flt_cfg.items()
+                if k in FilterConfig.__dataclass_fields__
+            }),
         )

@@ -1,12 +1,19 @@
-"""Pipeline orchestrator: ingestion -> detection -> ensemble -> filtering -> validation."""
+"""Pipeline orchestrator: ingestion -> detection -> hybrid ensemble -> filtering -> validation."""
 
 import logging
 import time
 
+import numpy as np
 import pandas as pd
 
-from pipeline.detector_classic import detect_all as detect_classic
-from pipeline.ensemble import ensemble_vote
+from pipeline.detector_classic import (
+    detect_all as detect_classic,
+    detect_gaps,
+    detect_range_violation,
+    detect_outliers_zscore,
+    detect_sliding_window,
+)
+from pipeline.ensemble import hybrid_majority_vote
 from pipeline.filters_classic import apply_classic_filters
 from pipeline.ingestion import load_data, preprocess, validate_schema
 from pipeline.validator import calculate_metrics, validate_output
@@ -14,6 +21,9 @@ from pipeline.validator import calculate_metrics, validate_output
 logger = logging.getLogger(__name__)
 
 VALID_METHODS = ("classic", "ml", "both")
+
+# Detectors whose output is treated as "hard" (any-True → anomaly)
+HARD_DETECTORS = {"gaps", "range", "delta"}
 
 
 def run_pipeline(
@@ -26,11 +36,8 @@ def run_pipeline(
 
     Args:
         df: Corrupted telemetry data (columns: timestamp, value).
-        config: Configuration dict (from config/default.yaml).
-                If None, uses sensible defaults.
-        method: Detection/filtering method — 'classic', 'ml', or 'both'.
-                'both' runs classic and ML detectors, ensembles them,
-                and uses ML filtering with classic fallback.
+        config: Configuration dict. If None, uses sensible defaults.
+        method: Detection method — 'classic', 'ml', or 'both'.
 
     Returns:
         {
@@ -58,11 +65,12 @@ def run_pipeline(
     validate_schema(data)
     data = preprocess(data)
 
-    # --- 1b. Detrend for detection (does NOT modify `data`) ---
+    # --- 2. Detrend for detection (does NOT modify `data`) ---
     from pipeline.filters_classic import detrend_signal
+
     data_detrended = detrend_signal(data)
 
-    # --- 2. Detection ---
+    # --- 3. Detection ---
     logger.info("Step 2: Anomaly detection (method=%s)", method)
     detector_masks: dict[str, pd.Series] = {}
 
@@ -71,10 +79,11 @@ def run_pipeline(
         classic_masks = detect_classic(
             data_detrended,
             zscore_threshold=dsp_cfg.get("zscore_threshold", 2.0),
-            iqr_multiplier=dsp_cfg.get("iqr_multiplier", 1.5),
             window=dsp_cfg.get("window", 50),
             window_threshold=dsp_cfg.get("window_threshold", 3.0),
             max_gap_seconds=dsp_cfg.get("max_gap_seconds", 60),
+            range_std_multiplier=dsp_cfg.get("range_std_multiplier", 10.0),
+            delta_multiplier=dsp_cfg.get("delta_multiplier", 5.0),
             df_original=data,
         )
         detector_masks.update(classic_masks)
@@ -91,45 +100,55 @@ def run_pipeline(
         )
         detector_masks.update(ml_masks)
 
-    # --- 3. Ensemble ---
-    logger.info("Step 3: Ensemble voting (%d detectors)", len(detector_masks))
+    # --- 4. Hybrid Majority Ensemble ---
+    logger.info("Step 3: Hybrid ensemble voting (%d detectors)", len(detector_masks))
     ens_cfg = config.get("ensemble", {})
-    mask_list = list(detector_masks.values())
 
-    # All modes use "any" (min_agreement=1): each detector specializes in
-    # a different fault type (zscore→spikes, gaps→NaN, sliding→local),
-    # so requiring overlap loses valid detections.
-    default_strategy = "any"
-    default_min = 1
+    hard_masks = [m for k, m in detector_masks.items() if k in HARD_DETECTORS]
+    soft_masks = [m for k, m in detector_masks.items() if k not in HARD_DETECTORS]
 
-    fault_mask = ensemble_vote(
-        mask_list,
-        strategy=ens_cfg.get("strategy", default_strategy),
-        min_agreement=ens_cfg.get("min_agreement", default_min),
-    )
-
-    # --- 4. Filtering ---
-    logger.info("Step 4: Filtering (method=%s)", method)
-    if method in ("ml", "both"):
-        cleaned_data = _apply_ml_filter(data, fault_mask, config)
-        # Fill any remaining NaN gaps with classic interpolation
-        remaining_nan = cleaned_data["value"].isna()
-        if remaining_nan.any():
-            from pipeline.filters_classic import interpolate_gaps
-            cleaned_data = interpolate_gaps(cleaned_data, remaining_nan)
+    # Fallback: if only soft or only hard, adapt
+    if not hard_masks and not soft_masks:
+        # Should not happen, but guard against it
+        fault_mask = pd.Series(np.zeros(len(data), dtype=bool), index=data.index)
+    elif not soft_masks:
+        # Only hard detectors — union them
+        fault_mask = hybrid_majority_vote(hard_masks, [], min_agreement=1)
     else:
-        flt_cfg = config.get("classic_filter", {})
-        cleaned_data = apply_classic_filters(
-            data,
-            fault_mask,
-            median_window=flt_cfg.get("median_window", 5),
-            sg_window=flt_cfg.get("sg_window", 11),
-            sg_polyorder=flt_cfg.get("sg_polyorder", 3),
-            wavelet_family=flt_cfg.get("wavelet_family", "db4"),
-            wavelet_level=flt_cfg.get("wavelet_level", 3),
+        fault_mask = hybrid_majority_vote(
+            hard_masks,
+            soft_masks,
+            min_agreement=ens_cfg.get("min_agreement", 2),
         )
 
-    # --- 5. Validation ---
+    # Log pyramid layers
+    _empty = pd.Series(dtype=bool)
+    layer1_count = sum(
+        int(detector_masks.get(k, _empty).sum())
+        for k in ["gaps", "range", "delta"] if k in detector_masks
+    )
+    layer2_count = (
+        int(detector_masks.get("zscore", _empty).sum())
+        + int(detector_masks.get("sliding_window", _empty).sum())
+    )
+    layer3_count = int(detector_masks.get("isolation_forest", _empty).sum()) if "isolation_forest" in detector_masks else 0
+    layer4_count = int(detector_masks.get("lstm_ae", _empty).sum()) if "lstm_ae" in detector_masks else 0
+
+    logger.info(
+        "Pyramid detection — L1(hard): %d, L2(statistical): %d, L3(ML): %d, L4(temporal): %d",
+        layer1_count, layer2_count, layer3_count, layer4_count,
+    )
+
+    # --- 5. Filtering ---
+    logger.info("Step 4: Filtering (method=%s)", method)
+    flt_cfg = config.get("classic_filter", {})
+    cleaned_data = apply_classic_filters(
+        data,
+        fault_mask,
+        median_window=flt_cfg.get("median_window", 5),
+    )
+
+    # --- 6. Validation ---
     logger.info("Step 5: Validation")
     validate_output(cleaned_data)
 
@@ -156,23 +175,6 @@ def run_pipeline(
     }
 
 
-def _apply_ml_filter(
-    data: pd.DataFrame,
-    fault_mask: pd.Series,
-    config: dict,
-) -> pd.DataFrame:
-    """Apply ML-based filtering with interpolation fallback."""
-    from pipeline.filters_ml import reconstruct_with_lstm
-
-    ml_cfg = config.get("ml_reconstructor", {})
-    return reconstruct_with_lstm(
-        data,
-        fault_mask,
-        model_path=config.get("lstm_detector", {}).get("model_path", "models/lstm_ae.pt"),
-        blend_window=ml_cfg.get("blend_window", 10),
-    )
-
-
 def _build_fault_timeline(
     data: pd.DataFrame,
     detector_masks: dict[str, pd.Series],
@@ -187,7 +189,7 @@ def _build_fault_timeline(
         combined_mask: Ensemble-voted mask.
 
     Returns:
-        DataFrame with columns [timestamp, fault_type, severity].
+        DataFrame with columns [timestamp, fault_type, severity, reason].
     """
     rows: list[dict] = []
     fault_indices = combined_mask[combined_mask].index
@@ -195,13 +197,25 @@ def _build_fault_timeline(
     for idx in fault_indices:
         types = [name for name, mask in detector_masks.items() if mask.iloc[idx]]
         fault_type = "+".join(types) if types else "unknown"
-        severity = len(types) / len(detector_masks)
+        severity = len(types) / max(len(detector_masks), 1)
         ts = data["timestamp"].iloc[idx] if "timestamp" in data.columns else idx
+
+        if any(t in ("gaps", "range", "delta") for t in types):
+            reason = "hard_rule"
+        elif any(t in ("zscore", "sliding_window") for t in types):
+            reason = "statistical"
+        elif any(t == "isolation_forest" for t in types):
+            reason = "ml_outlier"
+        elif any(t == "lstm_ae" for t in types):
+            reason = "temporal_pattern"
+        else:
+            reason = "unknown"
 
         rows.append({
             "timestamp": ts,
             "fault_type": fault_type,
             "severity": round(severity, 2),
+            "reason": reason,
         })
 
-    return pd.DataFrame(rows, columns=["timestamp", "fault_type", "severity"])
+    return pd.DataFrame(rows, columns=["timestamp", "fault_type", "severity", "reason"])
