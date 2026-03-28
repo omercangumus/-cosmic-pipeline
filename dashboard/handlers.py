@@ -305,6 +305,19 @@ def upload_csv(file):
         return None, None, None, f"HATA: {_user_friendly_error(e)}", empty_update
 
 
+def export_cleaned():
+    """Export cleaned telemetry data as a downloadable CSV."""
+    result = _state.get("result")
+    if not result or "cleaned_data" not in result:
+        return gr.update(visible=False)
+    import tempfile
+    import os
+    cleaned = result["cleaned_data"]
+    path = os.path.join(tempfile.gettempdir(), "cleaned_telemetry.csv")
+    cleaned.to_csv(path, index=False)
+    return gr.update(value=path, visible=True)
+
+
 def run_pipeline_ui(method, selected_columns):
     """Run the pipeline and return all UI outputs."""
     if "corrupted" not in _state:

@@ -9,7 +9,7 @@ import logging
 
 import gradio as gr
 
-from dashboard.handlers import generate_data, run_pipeline_ui, upload_csv
+from dashboard.handlers import export_cleaned, generate_data, run_pipeline_ui, upload_csv
 
 logging.basicConfig(level=logging.INFO)
 
@@ -132,6 +132,11 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                 inputs=[radio_method, chk_columns],
                 outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
             )
+
+            with gr.Row():
+                btn_export = gr.Button("💾 Temizlenmis Veriyi Indir", variant="secondary")
+                file_export = gr.File(label="Indirme", visible=False)
+            btn_export.click(fn=export_cleaned, inputs=[], outputs=[file_export])
 
 
 if __name__ == "__main__":
