@@ -1,0 +1,32 @@
+[
+  {
+    "file": "solar_storm.csv",
+    "name": "Solar Storm",
+    "description": "Gunes firtinasi \u2014 yuksek enerji parcacik akisi",
+    "mission_type": "shield"
+  },
+  {
+    "file": "sensor_failure.csv",
+    "name": "Sensor Failure",
+    "description": "Sensor arizasi \u2014 veri bosluklari ve latch-up",
+    "mission_type": "repair"
+  },
+  {
+    "file": "orbit_drift.csv",
+    "name": "Orbit Drift",
+    "description": "Yorunge kaymasi \u2014 kumulatif radyasyon hasari",
+    "mission_type": "navigate"
+  },
+  {
+    "file": "comms_blackout.csv",
+    "name": "Comms Blackout",
+    "description": "Iletisim koparmasi \u2014 gunes ruzgari kaynakli",
+    "mission_type": "antenna"
+  },
+  {
+    "file": "thermal_anomaly.csv",
+    "name": "Thermal Anomaly",
+    "description": "Termal anomali \u2014 gunes paneli asiri isinma",
+    "mission_type": "cooldown"
+  }
+]
