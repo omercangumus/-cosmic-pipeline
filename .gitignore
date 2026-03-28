@@ -18,3 +18,6 @@ build/
 notebooks/.ipynb_checkpoints/
 .pytest_cache/
 logs/
+goes_data/
+.kiro/
+*.pt.bak

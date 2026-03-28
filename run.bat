@@ -24,6 +24,6 @@ docker compose up -d
 
 echo.
 echo ========================================
-echo   Dashboard aciliyor: http://localhost:8501
+echo   Dashboard aciliyor: http://localhost:7860
 echo ========================================
-start http://localhost:8501
+start http://localhost:7860

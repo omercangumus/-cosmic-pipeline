@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: cosmic-pipeline-app
     ports:
-      - "8501:8501"
+      - "7860:7860"
     volumes:
       # LSTM model dosyası — commit edilmez, yerelden mount edilir
       - ./models:/app/models
@@ -19,7 +19,7 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -22,13 +22,9 @@ COPY . .
 # lstm_ae.pt image'a dahil edilmez — volume ile gelir
 # .dockerignore bunu zaten engeller
 
-EXPOSE 8501
+EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+    CMD curl -f http://localhost:7860/ || exit 1
 
-CMD ["streamlit", "run", "dashboard/app.py", \
-     "--server.port=8501", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true", \
-     "--server.enableCORS=false"]
+CMD ["python", "dashboard/app.py"]
