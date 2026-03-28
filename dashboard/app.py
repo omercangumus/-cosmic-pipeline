@@ -138,6 +138,14 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                 file_export = gr.File(label="Indirme", visible=False)
             btn_export.click(fn=export_cleaned, inputs=[], outputs=[file_export])
 
+        # ── TAB 3: DataCraft ─────────────────────────
+        with gr.Tab("🎮 DataCraft"):
+            _game_path = Path(__file__).parent / "game.html"
+            gr.HTML(
+                value=_game_path.read_text(encoding="utf-8"),
+                label="Kozmik Veri Görselleştirme",
+            )
+
 
 if __name__ == "__main__":
     app.launch(server_port=7860, share=False, theme=theme)

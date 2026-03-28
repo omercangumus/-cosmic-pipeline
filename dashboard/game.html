@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>DataCraft — Kozmik Veri Görselleştirme</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #0a0e17; overflow: hidden; font-family: monospace; }
+  canvas { display: block; }
+  #hud {
+    position: absolute; top: 20px; left: 20px; color: #00d4ff;
+    font-size: 14px; z-index: 10; text-shadow: 0 0 10px rgba(0,212,255,0.5);
+  }
+  #status {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    color: white; font-size: 24px; z-index: 10; text-align: center;
+    text-shadow: 0 0 20px rgba(255,255,255,0.5);
+    transition: opacity 0.5s;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>🛰️ COSMIC PIPELINE — DataCraft Görselleştirme</div>
+  <div id="stats"></div>
+</div>
+<div id="status">Veri bekleniyor...</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// === CONFIG ===
+const GRID = 10;
+const BLOCK_SIZE = 1;
+const GAP = 0.1;
+
+// === SCENE SETUP ===
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e17);
+scene.fog = new THREE.Fog(0x0a0e17, 20, 50);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(12, 10, 12);
+camera.lookAt(5, 0, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+// Lights
+const ambient = new THREE.AmbientLight(0x404040, 0.5);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+dirLight.position.set(10, 15, 10);
+scene.add(dirLight);
+const pointLight = new THREE.PointLight(0x00d4ff, 1, 30);
+pointLight.position.set(5, 8, 5);
+scene.add(pointLight);
+
+// === VOXEL WORLD ===
+const blocks = [];
+const geometry = new THREE.BoxGeometry(BLOCK_SIZE - GAP, BLOCK_SIZE - GAP, BLOCK_SIZE - GAP);
+
+const cleanColors = [0x00ff88, 0x00d4ff, 0x3b82f6, 0x22c55e, 0x06b6d4];
+const corruptColors = [0xff4444, 0xf59e0b, 0xef4444, 0xf97316, 0xeab308];
+
+for (let x = 0; x < GRID; x++) {
+  for (let z = 0; z < GRID; z++) {
+    const height = Math.floor(Math.random() * 3) + 1;
+    for (let y = 0; y < height; y++) {
+      const color = cleanColors[Math.floor(Math.random() * cleanColors.length)];
+      const mat = new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.9 });
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.position.set(x * (BLOCK_SIZE + GAP), y * (BLOCK_SIZE + GAP), z * (BLOCK_SIZE + GAP));
+      mesh.userData = {
+        originalPos: mesh.position.clone(),
+        originalColor: color,
+        corruptColor: corruptColors[Math.floor(Math.random() * corruptColors.length)],
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 2,
+      };
+      scene.add(mesh);
+      blocks.push(mesh);
+    }
+  }
+}
+
+// === PARTICLES ===
+const particleCount = 200;
+const particleGeo = new THREE.BufferGeometry();
+const particlePos = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount * 3; i++) {
+  particlePos[i] = Math.random() * 20 - 5;
+}
+particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+const particleMat = new THREE.PointsMaterial({ color: 0xff4444, size: 0.1, transparent: true, opacity: 0.8 });
+const particles = new THREE.Points(particleGeo, particleMat);
+scene.add(particles);
+
+// === STATE ===
+let state = 'corrupt';
+let corruptionLevel = 1.0;
+let faultsDetected = 0;
+let faultsCorrected = 0;
+let processingTime = 0;
+
+// === PIPELINE SONUCU AL ===
+function updateFromPipeline(result) {
+  faultsDetected = result.faults_detected || 0;
+  faultsCorrected = result.faults_corrected || 0;
+  processingTime = result.processing_time || 0;
+  state = 'cleaning';
+  document.getElementById('status').textContent = 'Pipeline çalışıyor... Veri temizleniyor';
+  document.getElementById('status').style.color = '#f59e0b';
+  document.getElementById('status').style.opacity = '1';
+}
+
+// === ANIMATION ===
+const clock = new THREE.Clock();
+let angle = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+
+  // Camera rotation
+  angle += dt * 0.1;
+  camera.position.x = 5 + Math.cos(angle) * 15;
+  camera.position.z = 5 + Math.sin(angle) * 15;
+  camera.position.y = 8 + Math.sin(t * 0.3) * 2;
+  camera.lookAt(5, 2, 5);
+
+  // State machine
+  if (state === 'cleaning') {
+    corruptionLevel -= dt * 0.3;
+    if (corruptionLevel <= 0) {
+      corruptionLevel = 0;
+      state = 'clean';
+      document.getElementById('status').textContent = '✅ Veri temizlendi!';
+      document.getElementById('status').style.color = '#00ff88';
+      setTimeout(() => {
+        document.getElementById('status').style.opacity = '0';
+      }, 2000);
+    }
+  }
+
+  // Update blocks
+  blocks.forEach((block) => {
+    const ud = block.userData;
+    if (corruptionLevel > 0) {
+      const shake = corruptionLevel * 0.3;
+      block.position.x = ud.originalPos.x + (Math.random() - 0.5) * shake;
+      block.position.y = ud.originalPos.y + (Math.random() - 0.5) * shake;
+      block.position.z = ud.originalPos.z + (Math.random() - 0.5) * shake;
+
+      const lerpFactor = corruptionLevel;
+      const r = ((ud.corruptColor >> 16) & 0xff) / 255;
+      const g = ((ud.corruptColor >> 8) & 0xff) / 255;
+      const b = (ud.corruptColor & 0xff) / 255;
+      const or2 = ((ud.originalColor >> 16) & 0xff) / 255;
+      const og = ((ud.originalColor >> 8) & 0xff) / 255;
+      const ob = (ud.originalColor & 0xff) / 255;
+      block.material.color.setRGB(
+        or2 + (r - or2) * lerpFactor,
+        og + (g - og) * lerpFactor,
+        ob + (b - ob) * lerpFactor,
+      );
+      block.material.opacity = 0.4 + (1 - corruptionLevel) * 0.6;
+    } else {
+      block.position.copy(ud.originalPos);
+      block.position.y += Math.sin(t * ud.speed + ud.phase) * 0.05;
+      const or2 = ((ud.originalColor >> 16) & 0xff) / 255;
+      const og = ((ud.originalColor >> 8) & 0xff) / 255;
+      const ob = (ud.originalColor & 0xff) / 255;
+      block.material.color.setRGB(or2, og, ob);
+      block.material.opacity = 0.9;
+    }
+  });
+
+  // Particles
+  particles.visible = corruptionLevel > 0.1;
+  if (particles.visible) {
+    const positions = particles.geometry.attributes.position.array;
+    for (let i = 0; i < particleCount; i++) {
+      positions[i * 3 + 1] += dt * (1 + Math.random()) * corruptionLevel;
+      if (positions[i * 3 + 1] > 15) positions[i * 3 + 1] = -2;
+    }
+    particles.geometry.attributes.position.needsUpdate = true;
+    particleMat.opacity = corruptionLevel * 0.8;
+  }
+
+  // HUD
+  document.getElementById('stats').innerHTML =
+    'Radyasyon Seviyesi: ' + (corruptionLevel * 100).toFixed(0) + '%<br>' +
+    'Durum: ' + (state === 'corrupt' ? '🔴 BOZUK' : state === 'cleaning' ? '🟡 TEMİZLENİYOR' : '🟢 TEMİZ') + '<br>' +
+    (faultsDetected > 0 ? 'Anomali: ' + faultsDetected + ' | Düzeltildi: ' + faultsCorrected + ' | Süre: ' + processingTime.toFixed(2) + 's' : '');
+
+  // Point light color
+  pointLight.color.setHex(corruptionLevel > 0.5 ? 0xff4444 : corruptionLevel > 0 ? 0xf59e0b : 0x00d4ff);
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// === RESIZE ===
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// === API ===
+window.cosmicUpdate = updateFromPipeline;
+
+// === DEMO: 3 sn sonra otomatik temizleme ===
+setTimeout(() => {
+  updateFromPipeline({
+    faults_detected: 156,
+    faults_corrected: 156,
+    processing_time: 2.15,
+  });
+}, 3000);
+
+// === Yeni bozulma döngüsü ===
+setInterval(() => {
+  if (state === 'clean') {
+    setTimeout(() => {
+      corruptionLevel = 0.7 + Math.random() * 0.3;
+      state = 'corrupt';
+      faultsDetected = 0;
+      faultsCorrected = 0;
+      document.getElementById('status').style.opacity = '1';
+      document.getElementById('status').textContent = '⚠️ Yeni radyasyon dalgası algılandı!';
+      document.getElementById('status').style.color = '#ff4444';
+    }, 5000);
+  }
+}, 15000);
+</script>
+</body>
+</html>
