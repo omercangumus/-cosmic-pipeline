@@ -113,11 +113,20 @@ def detect_with_lstm(
         return pd.Series(np.zeros(len(df), dtype=bool), index=df.index)
 
     sequences = create_sequences(values_norm, ws)
-    tensor = torch.tensor(sequences, dtype=torch.float32).to(device)
 
-    # Compute reconstruction error per window
-    errors_per_window = model.reconstruction_error(tensor)  # (n_windows, ws)
-    errors_np = errors_per_window.cpu().numpy()
+    # Batch processing to avoid CUDA OOM on large signals
+    batch_size = 512
+    n_seqs = len(sequences)
+    errors_list = []
+    model.eval()
+    with torch.no_grad():
+        for start in range(0, n_seqs, batch_size):
+            batch = torch.tensor(
+                sequences[start : start + batch_size], dtype=torch.float32,
+            ).to(device)
+            err = model.reconstruction_error(batch)  # (batch, ws)
+            errors_list.append(err.cpu().numpy())
+    errors_np = np.concatenate(errors_list, axis=0)
 
     # Map window-level errors back to per-point errors (average overlapping windows)
     n = len(values)
