@@ -2,717 +2,672 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>DataCraft — Kozmik Görevler</title>
+<title>DataCraft — Kozmik Gorevler v2</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#0a0e17; overflow:hidden; font-family:'Courier New',monospace; color:white; }
-canvas { display:block; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;overflow:hidden;font-family:'Courier New',monospace;color:#fff}
+canvas{display:block}
+#ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#ui>*{pointer-events:auto}
 
-#ui-overlay {
-  position:absolute; top:0; left:0; width:100%; height:100%;
-  pointer-events:none; z-index:10;
-}
-#ui-overlay > * { pointer-events:auto; }
+#hud{position:absolute;top:10px;left:10px;background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:8px;padding:12px;min-width:260px;font-size:12px;line-height:1.6}
+#hud .t{color:#00d4ff;font-size:14px;font-weight:bold;margin-bottom:6px}
+#hud .s{color:#8bb8d4}
+#hud .v{color:#00ff88;float:right}
 
-#hud {
-  position:absolute; top:10px; left:10px;
-  background:rgba(0,20,40,0.85); border:1px solid #00d4ff;
-  border-radius:8px; padding:12px; min-width:280px;
-  font-size:12px; line-height:1.6;
-}
-#hud .title { color:#00d4ff; font-size:14px; font-weight:bold; margin-bottom:6px; }
-#hud .stat { color:#8bb8d4; }
-#hud .val { color:#00ff88; float:right; }
-#hud .warn { color:#f59e0b; }
-#hud .danger { color:#ff4444; }
+#guide{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.9);border:1px solid #f59e0b;border-radius:8px;padding:10px 24px;font-size:13px;color:#f59e0b;text-align:center;opacity:0;transition:opacity .5s;max-width:500px;display:none}
+#guide.show{display:block;opacity:1}
 
-#mission-panel {
-  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  background:rgba(0,15,30,0.95); border:2px solid #00d4ff;
-  border-radius:12px; padding:24px; text-align:center;
-  max-width:500px; width:90%;
-  box-shadow:0 0 40px rgba(0,212,255,0.2);
-  display:none;
-}
-#mission-panel h2 { color:#00d4ff; margin-bottom:10px; font-size:20px; }
-#mission-panel .desc { color:#8bb8d4; margin-bottom:8px; font-size:13px; }
-#mission-panel .pipeline-info {
-  background:rgba(0,50,80,0.5); border-radius:6px; padding:10px; margin:10px 0;
-  text-align:left; font-size:11px; color:#00ff88;
-}
-#mission-panel .objective { color:#f59e0b; font-size:14px; margin:10px 0; font-weight:bold; }
-#mission-panel button {
-  background:linear-gradient(135deg,#00d4ff,#0088aa); border:none;
-  color:white; padding:10px 30px; border-radius:6px; cursor:pointer;
-  font-size:14px; font-family:inherit; margin-top:8px;
-  transition:transform 0.2s;
-}
-#mission-panel button:hover { transform:scale(1.05); }
+#interact-hint{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.9);border:1px solid #00ff88;border-radius:6px;padding:6px 16px;font-size:12px;color:#00ff88;display:none}
 
-#stage-complete {
-  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  background:rgba(0,15,30,0.95); border:2px solid #00ff88;
-  border-radius:12px; padding:30px; text-align:center;
-  max-width:450px; display:none;
-  box-shadow:0 0 60px rgba(0,255,136,0.3);
-}
-#stage-complete h1 { color:#00ff88; font-size:28px; }
-#stage-complete button {
-  background:linear-gradient(135deg,#00ff88,#00aa55); border:none;
-  color:#0a0e17; padding:12px 40px; border-radius:6px; cursor:pointer;
-  font-size:16px; font-weight:bold; font-family:inherit; margin-top:15px;
-}
+#mission-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,15,30,.95);border:2px solid #00d4ff;border-radius:12px;padding:24px;text-align:center;max-width:500px;width:90%;box-shadow:0 0 40px rgba(0,212,255,.2);display:none}
+#mission-panel h2{color:#00d4ff;margin-bottom:10px;font-size:20px}
+#mission-panel .desc{color:#8bb8d4;margin-bottom:8px;font-size:13px}
+#mission-panel .pi{background:rgba(0,50,80,.5);border-radius:6px;padding:10px;margin:10px 0;text-align:left;font-size:11px;color:#00ff88}
+#mission-panel .obj{color:#f59e0b;font-size:14px;margin:10px 0;font-weight:bold}
+#mission-panel button{background:linear-gradient(135deg,#00d4ff,#0088aa);border:none;color:#fff;padding:10px 30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit;margin-top:8px;transition:transform .2s}
+#mission-panel button:hover{transform:scale(1.05)}
 
-#progress-bar {
-  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
-  background:rgba(0,20,40,0.85); border:1px solid #00d4ff;
-  border-radius:20px; padding:6px 16px; font-size:11px;
-  display:flex; gap:8px; align-items:center;
-}
-.prog-dot {
-  width:14px; height:14px; border-radius:50%; border:2px solid #335;
-  display:inline-block;
-}
-.prog-dot.done { background:#00ff88; border-color:#00ff88; }
-.prog-dot.active { background:#f59e0b; border-color:#f59e0b; animation:pulse 1s infinite; }
-.prog-dot.locked { background:#222; border-color:#335; }
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+#pipeline-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,10,20,.95);border:2px solid #f59e0b;border-radius:12px;padding:20px;text-align:center;min-width:350px;display:none}
+#pipeline-overlay h3{color:#f59e0b;margin-bottom:10px}
+.ps{color:#555;font-size:12px;margin:4px 0;transition:color .3s}
+.ps.a{color:#f59e0b}
+.ps.d{color:#00ff88}
 
-#controls-hint {
-  position:absolute; bottom:50px; left:50%; transform:translateX(-50%);
-  color:#445; font-size:11px; text-align:center;
-}
+#stage-complete{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,15,30,.95);border:2px solid #00ff88;border-radius:12px;padding:30px;text-align:center;max-width:450px;display:none;box-shadow:0 0 60px rgba(0,255,136,.3)}
+#stage-complete h1{color:#00ff88;font-size:28px}
+#stage-complete button{background:linear-gradient(135deg,#00ff88,#00aa55);border:none;color:#0a0e17;padding:12px 40px;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;font-family:inherit;margin-top:15px}
 
-#pipeline-overlay {
-  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  background:rgba(0,10,20,0.95); border:2px solid #f59e0b;
-  border-radius:12px; padding:20px; text-align:center;
-  min-width:350px; display:none;
-}
-#pipeline-overlay h3 { color:#f59e0b; margin-bottom:10px; }
-.pipeline-step { color:#555; font-size:12px; margin:4px 0; transition:color 0.3s; }
-.pipeline-step.active { color:#f59e0b; }
-.pipeline-step.done { color:#00ff88; }
+#progress-bar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:20px;padding:6px 16px;font-size:11px;display:flex;gap:8px;align-items:center}
+.pd{width:14px;height:14px;border-radius:50%;border:2px solid #335;display:inline-block}
+.pd.dn{background:#00ff88;border-color:#00ff88}
+.pd.ac{background:#f59e0b;border-color:#f59e0b;animation:pu 1s infinite}
+.pd.lk{background:#222;border-color:#335}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
+
+#controls-hint{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);color:#445;font-size:11px;text-align:center}
+#minimap{position:absolute;bottom:50px;right:10px;width:140px;height:140px;background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:8px;overflow:hidden}
+#minimap canvas{width:100%;height:100%}
 </style>
 </head>
 <body>
-
-<div id="ui-overlay">
-  <div id="hud">
-    <div class="title">&#x1F6F0;&#xFE0F; COSMIC PIPELINE — DataCraft</div>
-    <div><span class="stat">Asama:</span> <span class="val" id="h-stage">1 / 2</span></div>
-    <div><span class="stat">Gorev:</span> <span class="val" id="h-mission">—</span></div>
-    <div><span class="stat">Radyasyon:</span> <span class="val" id="h-radiation">—</span></div>
-    <div><span class="stat">Ilerleme:</span> <span class="val" id="h-progress">0 / 4</span></div>
-    <div><span class="stat">Puan:</span> <span class="val" id="h-score">0</span></div>
-  </div>
-
-  <div id="mission-panel">
-    <h2 id="mp-title"></h2>
-    <div class="desc" id="mp-desc"></div>
-    <div class="pipeline-info" id="mp-pipeline"></div>
-    <div class="objective" id="mp-objective"></div>
-    <button id="mp-start">&#x25B6; GOREVE BASLA</button>
-  </div>
-
-  <div id="pipeline-overlay">
-    <h3>&#x1F527; Pipeline Calisiyor...</h3>
-    <div class="pipeline-step" id="ps-1">1. Veri Alimi</div>
-    <div class="pipeline-step" id="ps-2">2. Trend Kaldirma</div>
-    <div class="pipeline-step" id="ps-3">3. Anomali Tespiti (9 Detektor)</div>
-    <div class="pipeline-step" id="ps-4">4. Ensemble Oylama</div>
-    <div class="pipeline-step" id="ps-5">5. Filtreleme (Mercek Modeli)</div>
-    <div class="pipeline-step" id="ps-6">6. Dogrulama</div>
-    <div style="margin-top:12px;color:#8bb8d4;font-size:11px;" id="ps-status">Isleniyor...</div>
-  </div>
-
-  <div id="stage-complete">
-    <h1 id="sc-title"></h1>
-    <p id="sc-desc" style="color:#8bb8d4;margin:10px 0;"></p>
-    <p style="color:#00ff88;font-size:18px;" id="sc-score"></p>
-    <button id="sc-btn"></button>
-  </div>
-
-  <div id="progress-bar">
-    <span style="color:#00d4ff;font-size:10px;" id="pb-label">ASAMA 1</span>
-    <span class="prog-dot active" id="pd-0"></span>
-    <span class="prog-dot locked" id="pd-1"></span>
-    <span class="prog-dot locked" id="pd-2"></span>
-    <span class="prog-dot locked" id="pd-3"></span>
-    <span style="color:#335;">|</span>
-    <span style="color:#335;font-size:10px;">ASAMA 2</span>
-    <span class="prog-dot locked" id="pd-4"></span>
-    <span class="prog-dot locked" id="pd-5"></span>
-    <span class="prog-dot locked" id="pd-6"></span>
-    <span class="prog-dot locked" id="pd-7"></span>
-  </div>
-
-  <div id="controls-hint">WASD: Hareket | SPACE: Etkilesim | Fare: Bakis</div>
+<div id="ui">
+<div id="hud">
+<div class="t">&#x1F6F0;&#xFE0F; COSMIC PIPELINE — DataCraft v2</div>
+<div><span class="s">Asama:</span><span class="v" id="h-stg">1 / 2</span></div>
+<div><span class="s">Gorev:</span><span class="v" id="h-mis">—</span></div>
+<div><span class="s">Hedef:</span><span class="v" id="h-prg">—</span></div>
+<div><span class="s">Sure:</span><span class="v" id="h-time">0s</span></div>
+<div><span class="s">Puan:</span><span class="v" id="h-score">0</span></div>
+</div>
+<div id="guide"></div>
+<div id="interact-hint">SPACE ile etkilesim</div>
+<div id="mission-panel"><h2 id="mp-t"></h2><div class="desc" id="mp-d"></div><div class="pi" id="mp-p"></div><div class="obj" id="mp-o"></div><button id="mp-btn">GOREVE BASLA</button></div>
+<div id="pipeline-overlay"><h3>Pipeline Calisiyor...</h3><div class="ps" id="ps1">1. Veri Alimi</div><div class="ps" id="ps2">2. Trend Kaldirma</div><div class="ps" id="ps3">3. Anomali Tespiti</div><div class="ps" id="ps4">4. Ensemble Oylama</div><div class="ps" id="ps5">5. Filtreleme</div><div class="ps" id="ps6">6. Dogrulama</div><div style="margin-top:12px;color:#8bb8d4;font-size:11px" id="ps-st">Isleniyor...</div></div>
+<div id="stage-complete"><h1 id="sc-t"></h1><p id="sc-d" style="color:#8bb8d4;margin:10px 0"></p><p style="color:#00ff88;font-size:18px" id="sc-s"></p><button id="sc-b"></button></div>
+<div id="progress-bar">
+<span style="color:#00d4ff;font-size:10px" id="pb-l">ASAMA 1</span>
+<span class="pd ac" id="pd0"></span><span class="pd lk" id="pd1"></span><span class="pd lk" id="pd2"></span><span class="pd lk" id="pd3"></span>
+<span style="color:#335">|</span><span style="color:#335;font-size:10px">ASAMA 2</span>
+<span class="pd lk" id="pd4"></span><span class="pd lk" id="pd5"></span><span class="pd lk" id="pd6"></span><span class="pd lk" id="pd7"></span>
+</div>
+<div id="controls-hint">WASD: Hareket | SPACE: Etkilesim | Fare: Bakis | Tiklayarak basla</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-// ===============================================================
-// GAME CONFIG
-// ===============================================================
-var MISSIONS = {
-  stage1: [
-    {
-      id: 'solar_storm', name: 'Gunes Firtinasi',
-      desc: 'Yogun gunes partikul akisi uydu elektronigini tehdit ediyor.',
-      objective: '6 kalkan blogu yerlestirerek uyduyu koru!',
-      type: 'shield', targetCount: 6, color: 0xff4444,
-      blockColor: 0x3b82f6, reward: 100
-    },
-    {
-      id: 'sensor_failure', name: 'Sensor Arizasi',
-      desc: 'Radyasyon hasari sensorlerde veri kaybina neden oldu.',
-      objective: '5 bozuk sensoru tamir et (sari bloklara yaklas + SPACE)!',
-      type: 'repair', targetCount: 5, color: 0xf59e0b,
-      blockColor: 0xf59e0b, reward: 120
-    },
-    {
-      id: 'orbit_drift', name: 'Yorunge Kaymasi',
-      desc: 'Kumulatif radyasyon hasari yorunge kontrolunu bozuyor.',
-      objective: '4 yorunge duzeltme noktasina ulas (yesil bloklar)!',
-      type: 'navigate', targetCount: 4, color: 0x22c55e,
-      blockColor: 0x22c55e, reward: 150
-    },
-    {
-      id: 'comms_blackout', name: 'Iletisim Koparmasi',
-      desc: 'Gunes ruzgari uydu-yer iletisimini kesti.',
-      objective: '5 anten modulunu onar (mavi bloklara yaklas + SPACE)!',
-      type: 'antenna', targetCount: 5, color: 0x06b6d4,
-      blockColor: 0x06b6d4, reward: 130
-    }
-  ],
-  stage2: [
-    {
-      id: 'debris_field', name: 'Uzay Enkazi',
-      desc: 'Yorungede enkaz parcalari uyduyu tehdit ediyor.',
-      objective: '8 enkaz parcasini temizle (kirmizi bloklara SPACE)!',
-      type: 'repair', targetCount: 8, color: 0xef4444,
-      blockColor: 0xef4444, reward: 200
-    },
-    {
-      id: 'power_surge', name: 'Guc Dalgalanmasi',
-      desc: 'Gunes panellerinde asiri gerilim algilandi.',
-      objective: '6 regulator blogunu aktifle (mor bloklar + SPACE)!',
-      type: 'repair', targetCount: 6, color: 0x8b5cf6,
-      blockColor: 0x8b5cf6, reward: 180
-    },
-    {
-      id: 'magnetic_storm', name: 'Manyetik Firtina',
-      desc: 'Manyetik firtina navigasyon sistemini devre disi birakti.',
-      objective: '5 manyetik kalibrasyon noktasina ulas (turkuaz bloklar)!',
-      type: 'navigate', targetCount: 5, color: 0x00d4ff,
-      blockColor: 0x00d4ff, reward: 220
-    },
-    {
-      id: 'thermal_crisis', name: 'Termal Kriz',
-      desc: 'Sogutma sistemi arizalandi, sicaklik kritik seviyede.',
-      objective: '7 sogutma unitesini aktifle (beyaz bloklar + SPACE)!',
-      type: 'repair', targetCount: 7, color: 0xffffff,
-      blockColor: 0xffffff, reward: 250
-    }
-  ]
-};
+/* ═══════════════════════════════════════════════════════
+   MISSIONS
+   ═══════════════════════════════════════════════════════ */
+var MISSIONS={stage1:[
+{id:'solar_storm',name:'Gunes Firtinasi Kalkani',zone:'center',desc:'Gunes firtinasi yaklsiyor! Anten etrafina kalkan bloklari yerlestir!',objective:'6 kalkan blogunu topla ve antene yerlestir!',targetCount:6,color:0x3b82f6,reward:100},
+{id:'sensor_repair',name:'Hava Sensoru Tamiri',zone:'weather',desc:'Radyasyon 5 hava sensorunu bozdu! Sari sensörleri tamir et!',objective:'5 bozuk sensoru tamir et (yaklas + SPACE)!',targetCount:5,color:0xf59e0b,reward:120},
+{id:'irrigation',name:'Tarla Sulama Restorasyonu',zone:'farm',desc:'Uydu verisi sulama hattinin arizalandigini gosteriyor!',objective:'4 vana blogunu ac!',targetCount:4,color:0x22c55e,reward:150},
+{id:'comms_repair',name:'Acil Iletisim Onarimi',zone:'comms',desc:'Uydu-yer baglantisi koptu! Anten modullerini onar!',objective:'5 anten modulunu onar (yaklas + SPACE)!',targetCount:5,color:0x06b6d4,reward:130}
+],stage2:[
+{id:'debris',name:'Uzay Enkaz Temizligi',zone:'all',desc:'Yorungede 8 enkaz parcasi uyduyu tehdit ediyor!',objective:'8 enkaz parcasini temizle!',targetCount:8,color:0xef4444,reward:200},
+{id:'drought',name:'Kuraklik Mudahalesi',zone:'farm',desc:'Uydu termal goruntusu kuraklik tespit etti!',objective:'6 su deposunu aktifle!',targetCount:6,color:0x0088ff,reward:180},
+{id:'fire',name:'Yangin Sondurme',zone:'disaster',desc:'Uydu yangin noktalarini belirledi!',objective:'7 yangin sondurme unitesini aktifle!',targetCount:7,color:0xffffff,reward:220},
+{id:'calibration',name:'Manyetik Firtina Kalibrasyonu',zone:'all',desc:'Manyetik firtina tum sistemleri etkiledi!',objective:'5 kalibrasyon noktasini ziyaret et!',targetCount:5,color:0x8b5cf6,reward:250}
+]};
 
-// ===============================================================
-// GAME STATE
-// ===============================================================
-var currentStage = 1;
-var currentMissionIdx = 0;
-var score = 0;
-var missionActive = false;
-var missionTargets = [];
-var completed = 0;
-var targetCount = 0;
-var pipelineResult = null;
-var gamePhase = 'idle'; // idle, pipeline, briefing, playing, complete, stage_done
+var ZONE_CENTERS={center:{x:0,z:0},weather:{x:-12,z:-12},farm:{x:12,z:12},disaster:{x:-12,z:12},comms:{x:12,z:-12}};
+var ZONE_NAMES={center:'Merkez Kontrol Istasyonu',weather:'Hava Durumu Izleme Alani',farm:'Tarim Izleme Alani',disaster:'Afet Izleme Bolgesi',comms:'Uydu Haberlesme Alani'};
 
-// ===============================================================
-// THREE.JS SETUP
-// ===============================================================
-var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0e17);
-scene.fog = new THREE.FogExp2(0x0a0e17, 0.02);
+/* ═══════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════ */
+var stg=1,mIdx=0,score=0,mActive=false,targets=[],collected=0,tCount=0;
+var pResult=null,phase='idle',mTimer=0,mStartTime=0;
+var nearTarget=false;
 
-var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
-var renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+/* ═══════════════════════════════════════════════════════
+   THREE SETUP
+   ═══════════════════════════════════════════════════════ */
+var sc=new THREE.Scene();
+sc.background=new THREE.Color(0x0a0e17);
+sc.fog=new THREE.FogExp2(0x0a0e17,0.012);
 
-// Lights
-scene.add(new THREE.AmbientLight(0x334455, 0.6));
-var sun = new THREE.DirectionalLight(0xffeedd, 1.0);
-sun.position.set(20, 30, 10);
-sun.castShadow = true;
-scene.add(sun);
-var glowLight = new THREE.PointLight(0x00d4ff, 0.8, 50);
-glowLight.position.set(0, 10, 0);
-scene.add(glowLight);
+var cam=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,300);
+var ren=new THREE.WebGLRenderer({antialias:true});
+ren.setSize(innerWidth,innerHeight);
+ren.setPixelRatio(Math.min(devicePixelRatio,2));
+ren.shadowMap.enabled=true;
+ren.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(ren.domElement);
 
-// ===============================================================
-// STARFIELD
-// ===============================================================
-var starCount = 500;
-var starGeo = new THREE.BufferGeometry();
-var starPositions = new Float32Array(starCount * 3);
-for (var i = 0; i < starCount * 3; i++) {
-  starPositions[i] = (Math.random() - 0.5) * 150;
+sc.add(new THREE.AmbientLight(0x445566,0.7));
+var sunL=new THREE.DirectionalLight(0xffeedd,1.0);
+sunL.position.set(30,40,20);sunL.castShadow=true;
+sunL.shadow.mapSize.set(1024,1024);
+sunL.shadow.camera.left=-30;sunL.shadow.camera.right=30;
+sunL.shadow.camera.top=30;sunL.shadow.camera.bottom=-30;
+sc.add(sunL);
+
+/* ═══════════════════════════════════════════════════════
+   STARFIELD
+   ═══════════════════════════════════════════════════════ */
+var sG=new THREE.BufferGeometry(),sP=new Float32Array(600*3);
+for(var i=0;i<1800;i++)sP[i]=(Math.random()-.5)*200;
+sG.setAttribute('position',new THREE.BufferAttribute(sP,3));
+sc.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.15,transparent:true,opacity:0.6})));
+
+/* ═══════════════════════════════════════════════════════
+   HELPER: BOX
+   ═══════════════════════════════════════════════════════ */
+var _bx=new THREE.BoxGeometry(1,1,1);
+function box(sx,sy,sz,col,em,op){
+  var g=new THREE.BoxGeometry(sx,sy,sz);
+  var m=new THREE.MeshPhongMaterial({color:col,emissive:em||0x000000,transparent:op!==undefined,opacity:op||1});
+  var mesh=new THREE.Mesh(g,m);
+  mesh.castShadow=true;mesh.receiveShadow=true;
+  return mesh;
 }
-starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-var starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15, transparent: true, opacity: 0.7 });
-var stars = new THREE.Points(starGeo, starMat);
-scene.add(stars);
 
-// ===============================================================
-// VOXEL WORLD
-// ===============================================================
-var WORLD_SIZE = 24;
-var worldBlocks = [];
-var blockGeo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+/* ═══════════════════════════════════════════════════════
+   ROBLOX CHARACTER
+   ═══════════════════════════════════════════════════════ */
+var player=new THREE.Group();
+var pBody=box(.9,1.3,.5,0xeeeeff,0x111122);
+pBody.position.y=1.4;player.add(pBody);
 
-function buildWorld(corruptionLevel) {
-  worldBlocks.forEach(function(b) { scene.remove(b); });
-  worldBlocks.length = 0;
+var pHead=box(.6,.6,.6,0xffcc99,0x221100);
+pHead.position.y=2.35;player.add(pHead);
 
-  var floorColors = [0x1a2a3a, 0x152535, 0x0f1f2f, 0x1f2f3f];
+var pHelmet=box(.7,.35,.7,0x00d4ff,0x003355,0.6);
+pHelmet.position.y=2.55;player.add(pHelmet);
 
-  for (var x = 0; x < WORLD_SIZE; x++) {
-    for (var z = 0; z < WORLD_SIZE; z++) {
-      var floorMat = new THREE.MeshPhongMaterial({
-        color: floorColors[Math.floor(Math.random() * floorColors.length)],
-        transparent: true, opacity: 0.9
-      });
-      var floor = new THREE.Mesh(blockGeo, floorMat);
-      floor.position.set(x - WORLD_SIZE / 2, -0.5, z - WORLD_SIZE / 2);
-      floor.receiveShadow = true;
-      scene.add(floor);
-      worldBlocks.push(floor);
+var pVisor=box(.62,.2,.1,0x00ffff,0x00aaaa,0.5);
+pVisor.position.set(0,2.4,0.28);player.add(pVisor);
 
-      var dist = Math.sqrt(Math.pow(x - WORLD_SIZE / 2, 2) + Math.pow(z - WORLD_SIZE / 2, 2));
-      if (dist > WORLD_SIZE / 2 - 3 && Math.random() > 0.5) {
-        var h = Math.floor(Math.random() * 3) + 1;
-        for (var y = 0; y < h; y++) {
-          var wallMat = new THREE.MeshPhongMaterial({
-            color: corruptionLevel > 0.5 ? 0x442200 : 0x1a3a4a,
-            transparent: true, opacity: 0.7
-          });
-          var wall = new THREE.Mesh(blockGeo, wallMat);
-          wall.position.set(x - WORLD_SIZE / 2, y + 0.5, z - WORLD_SIZE / 2);
-          wall.castShadow = true;
-          scene.add(wall);
-          worldBlocks.push(wall);
-        }
-      }
-    }
-  }
+var pArmL=box(.28,.9,.28,0xeeeeff,0x111122);
+pArmL.position.set(-.62,1.5,0);pArmL.geometry.translate(0,-.45,0);player.add(pArmL);
+var pArmR=box(.28,.9,.28,0xeeeeff,0x111122);
+pArmR.position.set(.62,1.5,0);pArmR.geometry.translate(0,-.45,0);player.add(pArmR);
 
-  // Center platform (satellite control hub)
-  for (var cx = -2; cx <= 2; cx++) {
-    for (var cz = -2; cz <= 2; cz++) {
-      var platMat = new THREE.MeshPhongMaterial({ color: 0x00d4ff, emissive: 0x003344 });
-      var plat = new THREE.Mesh(blockGeo, platMat);
-      plat.position.set(cx, 0.5, cz);
-      scene.add(plat);
-      worldBlocks.push(plat);
-    }
-  }
+var pLegL=box(.28,.9,.28,0x444455,0x111111);
+pLegL.position.set(-.22,.45,0);pLegL.geometry.translate(0,-.45,0);player.add(pLegL);
+var pLegR=box(.28,.9,.28,0x444455,0x111111);
+pLegR.position.set(.22,.45,0);pLegR.geometry.translate(0,-.45,0);player.add(pLegR);
 
-  // Corruption particles
-  if (corruptionLevel > 0.3) {
-    var pCount = Math.floor(corruptionLevel * 100);
-    for (var p = 0; p < pCount; p++) {
-      var pMat = new THREE.MeshPhongMaterial({
-        color: 0xff4444, emissive: 0x440000, transparent: true, opacity: 0.6
-      });
-      var pMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), pMat);
-      pMesh.position.set(
-        (Math.random() - 0.5) * WORLD_SIZE,
-        Math.random() * 5 + 1,
-        (Math.random() - 0.5) * WORLD_SIZE
-      );
-      pMesh.userData.isParticle = true;
-      pMesh.userData.vy = Math.random() * 2 + 1;
-      scene.add(pMesh);
-      worldBlocks.push(pMesh);
-    }
+player.position.set(0,0,0);
+sc.add(player);
+
+var pAngle=0,pMoving=false;
+
+/* ═══════════════════════════════════════════════════════
+   MAP BUILDER
+   ═══════════════════════════════════════════════════════ */
+var mapObjs=[];
+var particles=[];
+
+function clearMap(){
+  mapObjs.forEach(function(o){sc.remove(o)});mapObjs.length=0;
+  particles.forEach(function(o){sc.remove(o)});particles.length=0;
+}
+
+function addToMap(m){sc.add(m);mapObjs.push(m);return m;}
+
+function buildFloor(cx,cz,w,h,col){
+  for(var x=0;x<w;x++)for(var z=0;z<h;z++){
+    var f=box(1,.3,1,col,0x000000);
+    f.position.set(cx-w/2+x+.5,-.15,cz-h/2+z+.5);
+    f.receiveShadow=true;addToMap(f);
   }
 }
 
-buildWorld(1.0);
-
-// ===============================================================
-// PLAYER
-// ===============================================================
-var playerGeo = new THREE.BoxGeometry(0.6, 1.2, 0.6);
-var playerMat = new THREE.MeshPhongMaterial({ color: 0x00ff88, emissive: 0x004422 });
-var player = new THREE.Mesh(playerGeo, playerMat);
-player.position.set(0, 1.5, 0);
-player.castShadow = true;
-scene.add(player);
-
-var helmetGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
-var helmetMat = new THREE.MeshPhongMaterial({ color: 0x00d4ff, emissive: 0x003355, transparent: true, opacity: 0.7 });
-var helmet = new THREE.Mesh(helmetGeo, helmetMat);
-helmet.position.y = 0.8;
-player.add(helmet);
-
-var cameraOffset = new THREE.Vector3(0, 8, 10);
-
-// Input
-var keys = {};
-var playerAngle = 0;
-
-document.addEventListener('keydown', function(e) {
-  keys[e.key.toLowerCase()] = true;
-  if (e.code === 'Space') {
-    e.preventDefault();
-    handleInteraction();
+function buildPath(x1,z1,x2,z2){
+  var dx=Math.sign(x2-x1),dz=Math.sign(z2-z1);
+  var cx=x1,cz=z1;
+  while(cx!==x2){
+    var p=box(1,.15,1,0x667788);p.position.set(cx,-.05,cz);addToMap(p);cx+=dx;
   }
-});
-document.addEventListener('keyup', function(e) { keys[e.key.toLowerCase()] = false; });
-document.addEventListener('mousemove', function(e) {
-  if (document.pointerLockElement) {
-    playerAngle -= e.movementX * 0.003;
+  while(cz!==z2){
+    var p2=box(1,.15,1,0x667788);p2.position.set(cx,-.05,cz);addToMap(p2);cz+=dz;
   }
+}
+
+function buildTree(x,z){
+  var trunk=box(.3,1.5,.3,0x8B4513,0x221100);trunk.position.set(x,.75,z);addToMap(trunk);
+  var leaves=box(1.2,1.2,1.2,0x228B22,0x114411);leaves.position.set(x,2,z);addToMap(leaves);
+}
+
+function buildLamp(x,z){
+  var pole=box(.15,2,.15,0x555555);pole.position.set(x,1,z);addToMap(pole);
+  var light=box(.3,.3,.3,0xffdd44,0xffaa00);light.position.set(x,2.2,z);addToMap(light);
+  var pl=new THREE.PointLight(0xffdd44,.5,8);pl.position.set(x,2.5,z);sc.add(pl);mapObjs.push(pl);
+}
+
+function buildAntenna(x,z,h){
+  for(var y=0;y<h;y++){var b=box(.5,1,.5,0x888888);b.position.set(x,y+.5,z);addToMap(b);}
+  var tip=box(.3,.3,.3,0xff0000,0xff0000);tip.position.set(x,h+.15,z);tip.userData.blink=true;addToMap(tip);
+}
+
+function buildParabola(x,z){
+  for(var dx=-1;dx<=1;dx++)for(var dz=-1;dz<=1;dz++){
+    var y=(dx===0&&dz===0)?1:1.5;
+    var b=box(.9,.3,.9,0xaaaaaa);b.position.set(x+dx,y,z+dz);addToMap(b);
+  }
+  var base=box(.4,1.5,.4,0x666666);base.position.set(x,.5,z);addToMap(base);
+}
+
+function buildWorld(){
+  clearMap();
+
+  // Base ground (dark)
+  var groundG=new THREE.PlaneGeometry(60,60);
+  var groundM=new THREE.MeshPhongMaterial({color:0x111820});
+  var ground=new THREE.Mesh(groundG,groundM);
+  ground.rotation.x=-Math.PI/2;ground.position.y=-.3;ground.receiveShadow=true;
+  addToMap(ground);
+
+  // ── Zone 1: Center Control Station ──
+  buildFloor(0,0,8,8,0x0a3a4a);
+  // Antenna
+  buildAntenna(0,0,5);
+  // Terminals (green cubes)
+  var tps=[[-2,3],[2,3],[-2,-3],[2,-3]];
+  tps.forEach(function(p){var t=box(.5,.5,.5,0x00ff88,0x004422);t.position.set(p[0],.55,p[1]);addToMap(t);});
+
+  // ── Zone 2: Weather (NW) ──
+  buildFloor(-12,-12,10,10,0x1a2a4a);
+  // Sensor poles
+  for(var i=0;i<4;i++){
+    var sx=-15+i*3,sz=-12;
+    var pole=box(.2,3,.2,0x888888);pole.position.set(sx,1.5,sz);addToMap(pole);
+    var sens=box(.5,.5,.5,0x3b82f6,0x112244);sens.position.set(sx,3.3,sz);addToMap(sens);
+  }
+  // Wind turbines
+  for(var w=0;w<2;w++){
+    var wx=-10+w*4,wz=-15;
+    var tb=box(.3,4,.3,0xaaaaaa);tb.position.set(wx,2,wz);addToMap(tb);
+    var blade=box(2,.15,.15,0xcccccc);blade.position.set(wx,4.2,wz);blade.userData.spin=true;addToMap(blade);
+  }
+  // Rain particles
+  for(var r=0;r<40;r++){
+    var rp=box(.05,.3,.05,0x4488ff,0x2244aa,0.6);
+    rp.position.set(-12+Math.random()*10-5,Math.random()*6,-12+Math.random()*10-5);
+    rp.userData.rain=true;rp.userData.vy=4+Math.random()*3;
+    sc.add(rp);particles.push(rp);
+  }
+
+  // ── Zone 3: Farm (SE) ──
+  var fColors=[0x228B22,0x228B22,0xBDB76B,0x8B4513,0x228B22,0xBDB76B,0x228B22,0x228B22,0x8B4513];
+  for(var fx=0;fx<3;fx++)for(var fz=0;fz<3;fz++){
+    var col=fColors[fx*3+fz];
+    buildFloor(10+fx*3,10+fz*3,3,3,col);
+  }
+  // Irrigation channels (blue lines)
+  for(var ic=0;ic<3;ic++){
+    var ch=box(.2,.1,9,0x0066cc,0x003366);ch.position.set(10+ic*3+1.5,0,12.5);addToMap(ch);
+  }
+  // Drone pad
+  var dpad=box(2,.1,2,0x888888);dpad.position.set(15,.01,15);addToMap(dpad);
+  var dmark=box(1.5,.12,.2,0xffff00);dmark.position.set(15,.05,15);addToMap(dmark);
+  var dmark2=box(.2,.12,1.5,0xffff00);dmark2.position.set(15,.05,15);addToMap(dmark2);
+
+  // ── Zone 4: Disaster (SW) ──
+  buildFloor(-12,12,10,10,0x4a2a1a);
+  // Ruined buildings
+  for(var rb=0;rb<5;rb++){
+    var rx=-14+rb*2,rz=12+Math.floor(Math.random()*6);
+    var rh=Math.floor(Math.random()*3)+1;
+    for(var ry=0;ry<rh;ry++){
+      var ruin=box(.9,.9,.9,0x554433);ruin.position.set(rx,ry+.5,rz);
+      ruin.rotation.x=(Math.random()-.5)*.2;ruin.rotation.z=(Math.random()-.5)*.2;
+      addToMap(ruin);
+    }
+  }
+  // Helipad
+  var hpad=box(3,.1,3,0x666666);hpad.position.set(-10,.01,15);addToMap(hpad);
+  var hh=box(1.8,.12,.2,0xffffff);hh.position.set(-10,.05,15);addToMap(hh);
+  var hv=box(.2,.12,1.8,0xffffff);hv.position.set(-10,.05,15);addToMap(hv);
+  // Smoke particles
+  for(var sm=0;sm<25;sm++){
+    var sp=box(.3,.3,.3,0x888888,0x333333,0.4);
+    sp.position.set(-12+Math.random()*8-4,Math.random()*4,12+Math.random()*8-4);
+    sp.userData.smoke=true;sp.userData.vy=0.5+Math.random();
+    sc.add(sp);particles.push(sp);
+  }
+
+  // ── Zone 5: Comms (NE) ──
+  buildFloor(12,-12,10,10,0x222233);
+  // Parabolic antennas
+  buildParabola(10,-12);buildParabola(15,-14);
+  // Server room (glass blocks)
+  for(var sx2=13;sx2<=15;sx2++)for(var sz2=-10;sz2<=-8;sz2++){
+    var sv=box(.95,2,.95,0x225522,0x00ff00,0.3);sv.position.set(sx2,1,sz2);addToMap(sv);
+  }
+  // Comm tower
+  buildAntenna(12,-15,7);
+
+  // ── Paths between zones ──
+  buildPath(4,0,10,0);   // center -> comms direction
+  buildPath(0,4,0,10);   // center -> farm direction
+  buildPath(-4,0,-10,0); // center -> weather direction
+  buildPath(0,-4,0,-10); // center -> comms direction
+  buildPath(4,0,4,10);   // shortcut
+  buildPath(-4,0,-4,10); // shortcut
+  buildPath(4,0,4,-10);
+  buildPath(-4,0,-4,-10);
+  // Diagonal connectors
+  buildPath(4,4,10,10);  // to farm
+  buildPath(-4,-4,-10,-10); // to weather
+  buildPath(-4,4,-10,10);  // to disaster
+  buildPath(4,-4,10,-10);  // to comms
+
+  // ── Lamps along paths ──
+  var lampPos=[[5,0],[-5,0],[0,5],[0,-5],[7,7],[-7,-7],[-7,7],[7,-7]];
+  lampPos.forEach(function(lp){buildLamp(lp[0],lp[1]);});
+
+  // ── Trees ──
+  var treePos=[[6,5],[-6,5],[6,-5],[-6,-5],[3,8],[-3,8],[8,3],[-8,3],[3,-8],[-3,-8],[8,-3],[-8,-3]];
+  treePos.forEach(function(tp){buildTree(tp[0],tp[1]);});
+}
+
+buildWorld();
+
+/* ═══════════════════════════════════════════════════════
+   INPUT
+   ═══════════════════════════════════════════════════════ */
+var keys={};
+document.addEventListener('keydown',function(e){
+  keys[e.key.toLowerCase()]=true;
+  if(e.code==='Space'){e.preventDefault();handleInteract();}
 });
-renderer.domElement.addEventListener('click', function() {
-  if (missionActive) renderer.domElement.requestPointerLock();
+document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;});
+document.addEventListener('mousemove',function(e){
+  if(document.pointerLockElement)pAngle-=e.movementX*0.003;
+});
+ren.domElement.addEventListener('click',function(){
+  if(mActive)ren.domElement.requestPointerLock();
 });
 
-// ===============================================================
-// MISSION TARGETS
-// ===============================================================
-function spawnTargets(mission) {
-  clearTargets();
-  completed = 0;
-  targetCount = mission.targetCount;
+/* ═══════════════════════════════════════════════════════
+   GUIDE TEXT
+   ═══════════════════════════════════════════════════════ */
+var guideEl=document.getElementById('guide');
+var guideTimer=null;
+function showGuide(txt,dur){
+  guideEl.textContent=txt;guideEl.className='show';guideEl.style.display='block';guideEl.style.opacity='0';
+  setTimeout(function(){guideEl.style.opacity='1';},50);
+  if(guideTimer)clearTimeout(guideTimer);
+  if(dur)guideTimer=setTimeout(function(){guideEl.style.opacity='0';setTimeout(function(){guideEl.style.display='none';},500);},dur);
+}
+function hideGuide(){guideEl.style.opacity='0';setTimeout(function(){guideEl.style.display='none';},500);}
 
-  for (var i = 0; i < mission.targetCount; i++) {
-    var mat = new THREE.MeshPhongMaterial({
-      color: mission.blockColor,
-      emissive: new THREE.Color(mission.blockColor).multiplyScalar(0.3),
-      transparent: true, opacity: 0.9
+/* ═══════════════════════════════════════════════════════
+   TARGETS
+   ═══════════════════════════════════════════════════════ */
+function spawnTargets(mission){
+  clearTargets();collected=0;tCount=mission.targetCount;
+  var zone=mission.zone;
+  for(var i=0;i<mission.targetCount;i++){
+    var mat=new THREE.MeshPhongMaterial({
+      color:mission.color,
+      emissive:new THREE.Color(mission.color).multiplyScalar(0.4),
+      transparent:true,opacity:0.9
     });
-    var target = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), mat);
-
-    var px, pz;
-    do {
-      px = (Math.random() - 0.5) * (WORLD_SIZE - 6);
-      pz = (Math.random() - 0.5) * (WORLD_SIZE - 6);
-    } while (Math.abs(px) < 3 && Math.abs(pz) < 3);
-
-    target.position.set(px, 1.0, pz);
-    target.castShadow = true;
-    target.userData = { isTarget: true, collected: false, originalY: 1.0 };
-    scene.add(target);
-    missionTargets.push(target);
+    var t=new THREE.Mesh(new THREE.BoxGeometry(.8,.8,.8),mat);
+    var px,pz;
+    if(zone==='all'){
+      // Spread across all zones
+      var zones=['center','weather','farm','disaster','comms'];
+      var zn=zones[i%zones.length];
+      var zc=ZONE_CENTERS[zn];
+      px=zc.x+(Math.random()-.5)*8;
+      pz=zc.z+(Math.random()-.5)*8;
+    } else if(zone==='center'){
+      px=(Math.random()-.5)*6;pz=(Math.random()-.5)*6;
+    } else {
+      var zc2=ZONE_CENTERS[zone];
+      px=zc2.x+(Math.random()-.5)*8;
+      pz=zc2.z+(Math.random()-.5)*8;
+    }
+    t.position.set(px,1.2,pz);
+    t.castShadow=true;
+    t.userData={isTarget:true,collected:false,origY:1.2};
+    sc.add(t);targets.push(t);
   }
 }
 
-function clearTargets() {
-  missionTargets.forEach(function(t) { scene.remove(t); });
-  missionTargets.length = 0;
-}
+function clearTargets(){targets.forEach(function(t){sc.remove(t)});targets.length=0;}
 
-function handleInteraction() {
-  if (!missionActive) return;
-
-  missionTargets.forEach(function(target) {
-    if (target.userData.collected) return;
-    var dist = player.position.distanceTo(target.position);
-    if (dist < 2.5) {
-      target.userData.collected = true;
-      target.material.emissive.setHex(0x00ff88);
-      target.scale.set(1.3, 1.3, 1.3);
-      setTimeout(function() { target.visible = false; }, 300);
-      completed++;
-
-      // Update HUD inline
-      document.getElementById('h-progress').textContent =
-        completed + ' / ' + targetCount;
-
-      if (completed >= targetCount) {
-        completeMission();
-      }
+function handleInteract(){
+  if(!mActive)return;
+  targets.forEach(function(t){
+    if(t.userData.collected)return;
+    var d=player.position.distanceTo(t.position);
+    if(d<2.5){
+      t.userData.collected=true;
+      t.material.emissive.setHex(0x00ff88);
+      t.scale.set(1.4,1.4,1.4);
+      setTimeout(function(){t.visible=false;},300);
+      collected++;
+      document.getElementById('h-prg').textContent=collected+' / '+tCount;
+      showGuide(collected+' / '+tCount+' tamamlandi! Kalan hedefleri bul!',3000);
+      if(collected>=tCount)completeMission();
     }
   });
 }
 
-// ===============================================================
-// GAME FLOW
-// ===============================================================
-function getMissions() {
-  return currentStage === 1 ? MISSIONS.stage1 : MISSIONS.stage2;
+/* ═══════════════════════════════════════════════════════
+   GAME FLOW
+   ═══════════════════════════════════════════════════════ */
+function getMs(){return stg===1?MISSIONS.stage1:MISSIONS.stage2;}
+
+function startNext(){
+  var ms=getMs();
+  if(mIdx>=ms.length){stageComplete();return;}
+  phase='pipeline';
+  showPipeline(ms[mIdx]);
 }
 
-function startNextMission() {
-  var missions = getMissions();
-  if (currentMissionIdx >= missions.length) {
-    stageComplete();
-    return;
-  }
-  gamePhase = 'pipeline';
-  showPipelineAnimation(missions[currentMissionIdx]);
-}
-
-function showPipelineAnimation(mission) {
-  var panel = document.getElementById('pipeline-overlay');
-  panel.style.display = 'block';
-
-  var steps = ['ps-1', 'ps-2', 'ps-3', 'ps-4', 'ps-5', 'ps-6'];
-  var labels = [
-    'Veri aliniyor...', 'Trend analizi...', '9 detektor calisiyor...',
-    'Oylama yapiliyor...', 'Filtreler uygulaniyor...', 'Dogrulama...'
-  ];
-  var step = 0;
-
-  var interval = setInterval(function() {
-    if (step > 0) document.getElementById(steps[step - 1]).className = 'pipeline-step done';
-    if (step < steps.length) {
-      document.getElementById(steps[step]).className = 'pipeline-step active';
-      document.getElementById('ps-status').textContent = labels[step];
+function showPipeline(mission){
+  var p=document.getElementById('pipeline-overlay');p.style.display='block';
+  var steps=['ps1','ps2','ps3','ps4','ps5','ps6'];
+  var labels=['Veri aliniyor...','Trend analizi...','9 detektor calisiyor...','Oylama yapiliyor...','Filtreler uygulaniyor...','Dogrulama...'];
+  var step=0;
+  var iv=setInterval(function(){
+    if(step>0)document.getElementById(steps[step-1]).className='ps d';
+    if(step<steps.length){
+      document.getElementById(steps[step]).className='ps a';
+      document.getElementById('ps-st').textContent=labels[step];
     }
     step++;
-    if (step > steps.length) {
-      clearInterval(interval);
-      pipelineResult = {
-        faults: Math.floor(Math.random() * 200) + 50,
-        corrected: Math.floor(Math.random() * 180) + 50,
-        time: (Math.random() * 3 + 0.5).toFixed(2)
-      };
-      document.getElementById('ps-status').textContent =
-        'Tamamlandi: ' + pipelineResult.faults + ' anomali bulundu';
-      document.getElementById('ps-status').style.color = '#00ff88';
-
-      setTimeout(function() {
-        panel.style.display = 'none';
-        steps.forEach(function(s) { document.getElementById(s).className = 'pipeline-step'; });
-        document.getElementById('ps-status').style.color = '#8bb8d4';
-        showMissionBriefing(mission);
-      }, 1500);
+    if(step>steps.length){
+      clearInterval(iv);
+      pResult={faults:Math.floor(Math.random()*200)+50,corrected:Math.floor(Math.random()*180)+50,time:(Math.random()*3+.5).toFixed(2)};
+      document.getElementById('ps-st').textContent='Tamamlandi: '+pResult.faults+' anomali bulundu';
+      document.getElementById('ps-st').style.color='#00ff88';
+      setTimeout(function(){
+        p.style.display='none';
+        steps.forEach(function(s){document.getElementById(s).className='ps';});
+        document.getElementById('ps-st').style.color='#8bb8d4';
+        showBriefing(mission);
+      },1200);
     }
-  }, 500);
+  },400);
 }
 
-function showMissionBriefing(mission) {
-  gamePhase = 'briefing';
-  var panel = document.getElementById('mission-panel');
-  document.getElementById('mp-title').textContent = mission.name;
-  document.getElementById('mp-desc').textContent = mission.desc;
-  document.getElementById('mp-pipeline').innerHTML =
-    'Pipeline Sonucu:<br>' +
-    'Anomali: ' + pipelineResult.faults + ' tespit | ' + pipelineResult.corrected + ' duzeltildi<br>' +
-    'Sure: ' + pipelineResult.time + 's | Guven: ' + (70 + Math.random() * 25).toFixed(0) + '%';
-  document.getElementById('mp-objective').textContent = mission.objective;
-  document.getElementById('mp-start').textContent = '\u25B6 GOREVE BASLA';
-  document.getElementById('mp-start').onclick = function() {
-    panel.style.display = 'none';
+function showBriefing(mission){
+  phase='briefing';
+  var p=document.getElementById('mission-panel');
+  document.getElementById('mp-t').textContent=mission.name;
+  document.getElementById('mp-d').textContent=mission.desc;
+  document.getElementById('mp-p').innerHTML='Pipeline Sonucu:<br>Anomali: '+pResult.faults+' tespit | '+pResult.corrected+' duzeltildi<br>Sure: '+pResult.time+'s | Guven: '+(70+Math.random()*25).toFixed(0)+'%';
+  document.getElementById('mp-o').textContent=mission.objective;
+  document.getElementById('mp-btn').textContent='\u25B6 GOREVE BASLA';
+  document.getElementById('mp-btn').onclick=function(){
+    p.style.display='none';
     beginMission(mission);
   };
-  panel.style.display = 'block';
+  p.style.display='block';
 }
 
-function beginMission(mission) {
-  gamePhase = 'playing';
-  missionActive = true;
-  player.position.set(0, 1.5, 0);
+function beginMission(mission){
+  phase='playing';mActive=true;mStartTime=performance.now();
+  // Move player to zone
+  var zc=ZONE_CENTERS[mission.zone==='all'?'center':mission.zone];
+  player.position.set(zc.x,0,zc.z+4);
   spawnTargets(mission);
-  document.getElementById('h-mission').textContent = mission.name;
-  document.getElementById('h-radiation').innerHTML =
-    '<span class="warn">' + pipelineResult.faults + ' anomali</span>';
-  document.getElementById('h-progress').textContent = '0 / ' + mission.targetCount;
-  buildWorld(0.3);
+  document.getElementById('h-mis').textContent=mission.name;
+  document.getElementById('h-prg').textContent='0 / '+mission.targetCount;
+  var zoneName=mission.zone==='all'?'Tum Bolgeler':ZONE_NAMES[mission.zone];
+  showGuide(zoneName+'! '+mission.objective,5000);
 }
 
-function completeMission() {
-  missionActive = false;
-  gamePhase = 'complete';
-  if (document.pointerLockElement) document.exitPointerLock();
+function completeMission(){
+  mActive=false;phase='complete';
+  if(document.pointerLockElement)document.exitPointerLock();
+  var ms=getMs(),m=ms[mIdx];
+  var elapsed=(performance.now()-mStartTime)/1000;
+  var bonus=elapsed<30?Math.floor(m.reward*.5):0;
+  var pts=m.reward+bonus;
+  score+=pts;
 
-  var missions = getMissions();
-  var mission = missions[currentMissionIdx];
-  score += mission.reward;
-
-  var dotIdx = (currentStage - 1) * 4 + currentMissionIdx;
-  document.getElementById('pd-' + dotIdx).className = 'prog-dot done';
-
-  currentMissionIdx++;
-
-  if (currentMissionIdx < missions.length) {
-    var nextDotIdx = (currentStage - 1) * 4 + currentMissionIdx;
-    document.getElementById('pd-' + nextDotIdx).className = 'prog-dot active';
+  var dotIdx=(stg-1)*4+mIdx;
+  document.getElementById('pd'+dotIdx).className='pd dn';
+  mIdx++;
+  if(mIdx<ms.length){
+    var ndot=(stg-1)*4+mIdx;
+    document.getElementById('pd'+ndot).className='pd ac';
   }
-
-  document.getElementById('h-score').textContent = score;
-  document.getElementById('h-progress').textContent =
-    currentMissionIdx + ' / ' + missions.length;
-
-  buildWorld(0);
+  document.getElementById('h-score').textContent=score;
   clearTargets();
 
-  if (currentMissionIdx >= missions.length) {
-    setTimeout(stageComplete, 1500);
+  var bonusTxt=bonus>0?' (Hiz bonusu: +'+bonus+')':'';
+  showGuide('GOREV TAMAMLANDI! +'+pts+' puan!'+bonusTxt,4000);
+
+  if(mIdx>=ms.length){
+    setTimeout(stageComplete,2000);
   } else {
-    var panel = document.getElementById('mission-panel');
-    document.getElementById('mp-title').textContent = 'GOREV TAMAMLANDI!';
-    document.getElementById('mp-desc').textContent = '+' + mission.reward + ' puan kazandin!';
-    document.getElementById('mp-pipeline').innerHTML = 'Toplam puan: ' + score;
-    document.getElementById('mp-objective').textContent = 'Sonraki gorev hazirlaniyor...';
-    document.getElementById('mp-start').textContent = '\u25B6 SONRAKI GOREV';
-    document.getElementById('mp-start').onclick = function() {
-      panel.style.display = 'none';
-      startNextMission();
-    };
-    panel.style.display = 'block';
+    setTimeout(function(){
+      var p=document.getElementById('mission-panel');
+      document.getElementById('mp-t').textContent='GOREV TAMAMLANDI!';
+      document.getElementById('mp-d').textContent='+'+pts+' puan kazandin!'+bonusTxt;
+      document.getElementById('mp-p').innerHTML='Toplam puan: '+score;
+      document.getElementById('mp-o').textContent='Sonraki gorev hazirlaniyor...';
+      document.getElementById('mp-btn').textContent='\u25B6 SONRAKI GOREV';
+      document.getElementById('mp-btn').onclick=function(){p.style.display='none';startNext();};
+      p.style.display='block';
+    },1500);
   }
 }
 
-function stageComplete() {
-  gamePhase = 'stage_done';
-  var panel = document.getElementById('stage-complete');
-
-  if (currentStage === 1) {
-    document.getElementById('sc-title').textContent = 'ASAMA 1 TAMAMLANDI!';
-    document.getElementById('sc-desc').textContent =
-      'Temel uydu koruma gorevlerini basariyla tamamladin. Gelismis gorevler aciliyor...';
-    document.getElementById('sc-score').textContent = 'Toplam Puan: ' + score;
-    document.getElementById('sc-btn').textContent = 'ASAMA 2\'YI AC';
-    document.getElementById('sc-btn').onclick = function() {
-      panel.style.display = 'none';
-      currentStage = 2;
-      currentMissionIdx = 0;
-      document.getElementById('h-stage').textContent = '2 / 2';
-      document.getElementById('h-progress').textContent = '0 / 4';
-      document.getElementById('pb-label').textContent = 'ASAMA 2';
-      document.getElementById('pd-4').className = 'prog-dot active';
-      buildWorld(1.0);
-      player.position.set(0, 1.5, 0);
-      startNextMission();
+function stageComplete(){
+  phase='stage_done';
+  var p=document.getElementById('stage-complete');
+  if(stg===1){
+    document.getElementById('sc-t').textContent='ASAMA 1 TAMAMLANDI!';
+    document.getElementById('sc-d').textContent='Temel uydu koruma gorevlerini basariyla tamamladin. Gelismis gorevler aciliyor...';
+    document.getElementById('sc-s').textContent='Toplam Puan: '+score;
+    document.getElementById('sc-b').textContent='ASAMA 2\'YI AC';
+    document.getElementById('sc-b').onclick=function(){
+      p.style.display='none';stg=2;mIdx=0;
+      document.getElementById('h-stg').textContent='2 / 2';
+      document.getElementById('pb-l').textContent='ASAMA 2';
+      document.getElementById('pd4').className='pd ac';
+      player.position.set(0,0,0);
+      startNext();
     };
   } else {
-    document.getElementById('sc-title').textContent = 'TUM GOREVLER TAMAMLANDI!';
-    document.getElementById('sc-desc').textContent =
-      'Kozmik veri muhafizi olarak tum gorevleri basariyla tamamladin!';
-    document.getElementById('sc-score').textContent = 'Final Puani: ' + score;
-    document.getElementById('sc-btn').textContent = 'BASTAN BASLA';
-    document.getElementById('sc-btn').onclick = function() {
-      panel.style.display = 'none';
-      currentStage = 1;
-      currentMissionIdx = 0;
-      score = 0;
-      for (var i = 0; i < 8; i++) document.getElementById('pd-' + i).className = 'prog-dot locked';
-      document.getElementById('pd-0').className = 'prog-dot active';
-      document.getElementById('h-stage').textContent = '1 / 2';
-      document.getElementById('h-progress').textContent = '0 / 4';
-      document.getElementById('h-score').textContent = '0';
-      document.getElementById('pb-label').textContent = 'ASAMA 1';
-      buildWorld(1.0);
-      player.position.set(0, 1.5, 0);
-      startNextMission();
+    document.getElementById('sc-t').textContent='TUM GOREVLER TAMAMLANDI!';
+    document.getElementById('sc-d').textContent='Kozmik veri muhafizi olarak tum gorevleri basariyla tamamladin!';
+    document.getElementById('sc-s').textContent='Final Puani: '+score;
+    document.getElementById('sc-b').textContent='BASTAN BASLA';
+    document.getElementById('sc-b').onclick=function(){
+      p.style.display='none';stg=1;mIdx=0;score=0;
+      for(var i=0;i<8;i++)document.getElementById('pd'+i).className='pd lk';
+      document.getElementById('pd0').className='pd ac';
+      document.getElementById('h-stg').textContent='1 / 2';
+      document.getElementById('h-score').textContent='0';
+      document.getElementById('pb-l').textContent='ASAMA 1';
+      player.position.set(0,0,0);
+      startNext();
     };
   }
-
-  panel.style.display = 'block';
+  p.style.display='block';
 }
 
-// ===============================================================
-// ANIMATION LOOP
-// ===============================================================
-var clock = new THREE.Clock();
+/* ═══════════════════════════════════════════════════════
+   ANIMATION
+   ═══════════════════════════════════════════════════════ */
+var clock=new THREE.Clock();
+var camOff=new THREE.Vector3(0,6,8);
 
-function animate() {
+function animate(){
   requestAnimationFrame(animate);
-  var dt = clock.getDelta();
-  var t = clock.getElapsedTime();
+  var dt=clock.getDelta();
+  var t=clock.getElapsedTime();
 
   // Player movement
-  if (missionActive) {
-    var speed = 6 * dt;
-    var dir = new THREE.Vector3();
-
-    if (keys['w']) dir.z -= 1;
-    if (keys['s']) dir.z += 1;
-    if (keys['a']) dir.x -= 1;
-    if (keys['d']) dir.x += 1;
-
-    if (dir.length() > 0) {
-      dir.normalize();
-      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), playerAngle);
-      player.position.add(dir.multiplyScalar(speed));
-      player.rotation.y = playerAngle;
+  pMoving=false;
+  if(mActive){
+    var spd=8*dt;
+    var dir=new THREE.Vector3();
+    if(keys['w'])dir.z-=1;
+    if(keys['s'])dir.z+=1;
+    if(keys['a'])dir.x-=1;
+    if(keys['d'])dir.x+=1;
+    if(dir.length()>0){
+      dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),pAngle);
+      player.position.add(dir.multiplyScalar(spd));
+      player.rotation.y=pAngle;
+      pMoving=true;
     }
+    var bnd=19;
+    player.position.x=Math.max(-bnd,Math.min(bnd,player.position.x));
+    player.position.z=Math.max(-bnd,Math.min(bnd,player.position.z));
 
-    var bound = WORLD_SIZE / 2 - 1;
-    player.position.x = Math.max(-bound, Math.min(bound, player.position.x));
-    player.position.z = Math.max(-bound, Math.min(bound, player.position.z));
+    // Mission timer
+    document.getElementById('h-time').textContent=((performance.now()-mStartTime)/1000).toFixed(0)+'s';
   }
 
-  // Camera follow
-  var camTarget = player.position.clone().add(
-    cameraOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), playerAngle)
-  );
-  camera.position.lerp(camTarget, 3 * dt);
-  camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+  // Walk animation
+  if(pMoving){
+    var swing=Math.sin(t*10)*0.5;
+    pLegL.rotation.x=swing;pLegR.rotation.x=-swing;
+    pArmL.rotation.x=-swing*.7;pArmR.rotation.x=swing*.7;
+  } else {
+    pLegL.rotation.x*=0.9;pLegR.rotation.x*=0.9;
+    pArmL.rotation.x*=0.9;pArmR.rotation.x*=0.9;
+  }
 
-  // Target animations
-  missionTargets.forEach(function(target) {
-    if (!target.userData.collected && target.visible) {
-      target.position.y = target.userData.originalY + Math.sin(t * 2 + target.position.x) * 0.2;
-      target.rotation.y = t * 1.5;
+  // Camera
+  var ct=player.position.clone().add(camOff.clone().applyAxisAngle(new THREE.Vector3(0,1,0),pAngle));
+  cam.position.lerp(ct,4*dt);
+  cam.lookAt(player.position.x,player.position.y+2,player.position.z);
+
+  // Target animation + proximity check
+  nearTarget=false;
+  targets.forEach(function(tg){
+    if(!tg.userData.collected&&tg.visible){
+      tg.position.y=tg.userData.origY+Math.sin(t*2.5+tg.position.x)*0.25;
+      tg.rotation.y=t*2;
+      if(mActive&&player.position.distanceTo(tg.position)<2.5)nearTarget=true;
+    }
+  });
+  document.getElementById('interact-hint').style.display=nearTarget?'block':'none';
+
+  // Particles: rain
+  particles.forEach(function(p){
+    if(p.userData.rain){
+      p.position.y-=p.userData.vy*dt;
+      if(p.position.y<0)p.position.y=6;
+    }
+    if(p.userData.smoke){
+      p.position.y+=p.userData.vy*dt;
+      if(p.position.y>5){p.position.y=0.5;p.position.x+=(Math.random()-.5)*2;p.position.z+=(Math.random()-.5)*2;}
     }
   });
 
-  // Floating corruption particles
-  worldBlocks.forEach(function(b) {
-    if (b.userData.isParticle) {
-      b.position.y += b.userData.vy * dt;
-      b.rotation.x += dt * 2;
-      b.rotation.z += dt;
-      if (b.position.y > 8) b.position.y = 0.5;
+  // Blinking lights
+  mapObjs.forEach(function(o){
+    if(o.userData&&o.userData.blink&&o.material){
+      o.material.opacity=.5+Math.sin(t*4)*.5;o.material.transparent=true;
     }
+    if(o.userData&&o.userData.spin){o.rotation.z=t*2;}
   });
 
-  // Glow pulse
-  glowLight.intensity = 0.5 + Math.sin(t * 2) * 0.3;
-  glowLight.position.copy(player.position);
-  glowLight.position.y += 3;
+  // Glow on player
+  sunL.target=player;
 
-  // Star twinkle
-  stars.rotation.y += dt * 0.005;
-
-  renderer.render(scene, camera);
+  ren.render(sc,cam);
 }
-
 animate();
 
-// Resize
-window.addEventListener('resize', function() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+window.addEventListener('resize',function(){
+  cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);
 });
 
-// ===============================================================
-// API — external pipeline result
-// ===============================================================
-window.cosmicUpdate = function(data) {
-  pipelineResult = {
-    faults: data.faults_detected || 0,
-    corrected: data.faults_corrected || 0,
-    time: data.processing_time || 0
-  };
+/* API */
+window.cosmicUpdate=function(data){
+  pResult={faults:data.faults_detected||0,corrected:data.faults_corrected||0,time:data.processing_time||0};
 };
 
-// ===============================================================
-// GAME START
-// ===============================================================
-setTimeout(function() { startNextMission(); }, 1000);
+/* START */
+setTimeout(function(){startNext();},800);
 </script>
 </body>
 </html>
