@@ -160,10 +160,8 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                     )
                     game_result = gr.HTML(label="Sonuc")
 
-            _game_path = Path(__file__).parent / "game.html"
             gr.HTML(
-                value=_game_path.read_text(encoding="utf-8"),
-                label="Kozmik Veri Görselleştirme",
+                value='<iframe src="/file=dashboard/game.html" width="100%" height="600" style="border:none; border-radius:12px;"></iframe>',
             )
 
             btn_game.click(
@@ -174,4 +172,9 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
 
 if __name__ == "__main__":
-    app.launch(server_port=7860, share=False, theme=theme)
+    app.launch(
+        server_port=7860,
+        share=False,
+        theme=theme,
+        allowed_paths=["dashboard/game.html"],
+    )
