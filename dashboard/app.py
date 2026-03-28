@@ -411,10 +411,7 @@ theme = gr.themes.Base(
     button_primary_text_color="white",
 )
 
-with gr.Blocks(
-    theme=theme,
-    title="Cosmic Pipeline",
-) as app:
+with gr.Blocks(title="Cosmic Pipeline") as app:
 
     gr.Markdown("# 🛰️ Kozmik Veri Ayiklama ve Isleme Hatti")
     gr.Markdown("**TUA Astro Hackathon 2026** — Ahmet & Omer")
@@ -446,10 +443,10 @@ with gr.Blocks(
                     with gr.Row():
                         with gr.Column():
                             gr.Markdown("#### Temiz Veri")
-                            tbl_clean = gr.Dataframe(label="Ground Truth", height=300)
+                            tbl_clean = gr.Dataframe(label="Ground Truth", max_height=300)
                         with gr.Column():
                             gr.Markdown("#### Bozuk Veri")
-                            tbl_corrupt = gr.Dataframe(label="Radyasyonlu", height=300)
+                            tbl_corrupt = gr.Dataframe(label="Radyasyonlu", max_height=300)
 
             btn_gen.click(
                 fn=generate_data,
@@ -487,7 +484,7 @@ with gr.Blocks(
                     code_log = gr.Code(label="Pipeline Log", language=None, lines=30)
 
                 with gr.Tab("📊 Anomali Tablosu"):
-                    tbl_faults = gr.Dataframe(label="Tespit Edilen Anomaliler", height=400)
+                    tbl_faults = gr.Dataframe(label="Tespit Edilen Anomaliler", max_height=400)
 
                 with gr.Tab("🔍 Dogrulama"):
                     txt_verify = gr.Textbox(
@@ -502,4 +499,4 @@ with gr.Blocks(
 
 
 if __name__ == "__main__":
-    app.launch(server_port=7860, share=False)
+    app.launch(server_port=7860, share=False, theme=theme)
