@@ -1,4 +1,4 @@
-"""Unit tests for ML modules: lstm_autoencoder, detector_ml, filters_ml."""
+"""Unit tests for ML modules: lstm_autoencoder, detector_ml."""
 
 import numpy as np
 import pandas as pd
@@ -127,19 +127,3 @@ class TestLSTMDetectorNoModel:
         assert len(mask) == 100
 
 
-# === ML Filter stub (always delegates to interpolation) ===
-
-class TestMLFilterStub:
-    def test_stub_delegates_to_interpolation(self):
-        from pipeline.filters_ml import reconstruct_with_lstm
-
-        values = np.array([1.0, 2.0, np.nan, np.nan, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2024-01-01", periods=10, freq="1s"),
-            "value": values,
-        })
-        mask = pd.Series([False, False, True, True, False, False, False, False, False, False])
-
-        result = reconstruct_with_lstm(df, mask)
-        assert result["value"].isna().sum() == 0
-        assert len(result) == 10

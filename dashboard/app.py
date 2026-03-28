@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO)
 
 _PIPELINE_LOGGERS = [
     "pipeline.orchestrator", "pipeline.detector_classic", "pipeline.detector_ml",
-    "pipeline.ensemble", "pipeline.filters_classic", "pipeline.filters_ml",
+    "pipeline.ensemble", "pipeline.filters_classic",
     "pipeline.validator", "pipeline.ingestion",
 ]
 
