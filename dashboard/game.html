@@ -120,14 +120,16 @@ canvas{display:block}
    FULLSCREEN (iframe-safe)
    =========================================================== */
 function toggleFS(){
-  var el=document.body;
-  if(!document.fullscreenElement){
-    (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen).call(el);
-    document.getElementById('fs-btn').textContent='\u2715 Kucult';
-  } else {
-    document.exitFullscreen();
-    document.getElementById('fs-btn').textContent='\u26F6 Tam Ekran';
-  }
+  try{
+    var el=document.documentElement;
+    if(!document.fullscreenElement){
+      (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen).call(el);
+      document.getElementById('fs-btn').textContent='\u2715 Kucult';
+    } else {
+      (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen).call(document);
+      document.getElementById('fs-btn').textContent='\u26F6 Tam Ekran';
+    }
+  }catch(e){console.log('Fullscreen error:',e);}
 }
 document.addEventListener('fullscreenchange',function(){
   if(!document.fullscreenElement)document.getElementById('fs-btn').textContent='\u26F6 Tam Ekran';

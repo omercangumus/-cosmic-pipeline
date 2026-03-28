@@ -164,7 +164,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
             _game_path = Path(__file__).parent / "game.html"
             _game_b64 = base64.b64encode(_game_path.read_bytes()).decode()
             gr.HTML(
-                value=f'<iframe src="data:text/html;base64,{_game_b64}" width="100%" height="600" style="border:none; border-radius:12px; background:#0a0e17;"></iframe>',
+                value=f'<iframe src="data:text/html;base64,{_game_b64}" width="100%" height="600" style="border:none; border-radius:12px; background:#0a0e17;" allowfullscreen allow="fullscreen"></iframe>',
             )
 
             btn_game.click(
