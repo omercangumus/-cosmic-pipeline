@@ -69,7 +69,7 @@ canvas{display:block}
 #mmc{width:130px;height:130px}
 #ch{position:absolute;bottom:28px;left:10px;color:#333;font-size:9px}
 .ft{position:absolute;pointer-events:none;font-size:16px;font-weight:bold;color:#00ff88;text-shadow:0 0 6px #00ff88;opacity:0;transition:opacity .3s,top .7s}
-#done-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;display:none;pointer-events:none}
+#done-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;display:none;pointer-events:auto;cursor:pointer}
 #done-overlay h1{color:#00ff88;font-size:28px;text-shadow:0 0 20px #00ff88}
 #done-overlay canvas{display:block;margin:8px auto;border-radius:4px}
 </style>
@@ -112,7 +112,7 @@ canvas{display:block}
 </div>
 <div id="mm"><canvas id="mmc" width="130" height="130"></canvas></div>
 <div id="ch">WASD Hareket | SHIFT Kos | SPACE Etkilesim | Fare Bakis</div>
-<div id="done-overlay"><h1></h1><canvas width="200" height="50"></canvas></div>
+<div id="done-overlay"><h1></h1><canvas width="200" height="50"></canvas><br><button id="done-btn" style="margin-top:10px;background:linear-gradient(135deg,#00ff88,#00aa55);border:none;color:#0a0e17;padding:8px 24px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;font-family:inherit;">Devam Et &#x25B6;</button></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -548,37 +548,28 @@ function completeMission(){
   console.log('[completeMission] mi now='+mi+' total='+ms.length);
 
   var _pts=pts,_bonus=bonus,_score=score,_mi=mi,_msLen=ms.length,_dt=m.dt;
-  setTimeout(function(){
-    try{
-      console.log('[timeout] firing, mi='+_mi+' msLen='+_msLen);
-      ov.style.display='none';
-      if(_mi>=_msLen){
-        console.log('[timeout] -> stageDone');
-        stageDone();
-      } else {
-        console.log('[timeout] -> showing next mission panel');
-        var p=document.getElementById('mp');
-        document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
-        document.getElementById('md').textContent=_dt;
-        document.getElementById('dv-canvas').style.display='none';
-        document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
-        document.getElementById('prl').innerHTML='';
-        document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
-        document.getElementById('mo').textContent='Sonraki gorev hazir';
-        document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
-        document.getElementById('mb').onclick=function(){
-          p.style.display='none';
-          document.getElementById('dv-canvas').style.display='block';
-          startNext();
-        };
-        p.style.display='block';
-        console.log('[timeout] panel displayed');
-      }
-    }catch(err){
-      console.error('[timeout] ERROR:',err);
-      ov.style.display='none';
+  document.getElementById('done-btn').onclick=function(){
+    ov.style.display='none';
+    if(_mi>=_msLen){
+      stageDone();
+    } else {
+      var p=document.getElementById('mp');
+      document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
+      document.getElementById('md').textContent=_dt;
+      document.getElementById('dv-canvas').style.display='none';
+      document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
+      document.getElementById('prl').innerHTML='';
+      document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
+      document.getElementById('mo').textContent='Sonraki gorev hazir';
+      document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
+      document.getElementById('mb').onclick=function(){
+        p.style.display='none';
+        document.getElementById('dv-canvas').style.display='block';
+        startNext();
+      };
+      p.style.display='block';
     }
-  },1500);
+  };
 }
 
 function stageDone(){
