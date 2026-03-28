@@ -290,14 +290,43 @@ st.markdown("# 🛰️ Cosmic Pipeline Dashboard")
 if not run_btn and "results" not in st.session_state:
     # Show raw data preview while waiting for the user to click Run
     st.info("Configure parameters in the sidebar and click **Run Pipeline**.")
-    if corrupted_df is not None and clean_df is not None:
+
+    st.markdown("### 📡 Veri Önizleme")
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.markdown("#### ☢️ Radyasyonlu Veri")
+        if corrupted_df is not None:
+            disp = corrupted_df[["timestamp", "value"]].head(50).copy()
+            disp.index = range(1, len(disp) + 1)
+            disp.index.name = "#"
+            st.dataframe(disp, use_container_width=True, height=400)
+            nan_n = int(corrupted_df["value"].isna().sum())
+            vmin = corrupted_df["value"].min()
+            vmax = corrupted_df["value"].max()
+            st.caption(
+                f"Toplam: {len(corrupted_df)} satır | NaN: {nan_n} "
+                f"| Min: {vmin:.2f} | Max: {vmax:.2f}"
+            )
+
+    with col_right:
+        st.markdown("#### ✅ Temiz Veri (Ground Truth)")
+        if clean_df is not None:
+            disp_c = clean_df[["timestamp", "value"]].head(50).copy()
+            disp_c.index = range(1, len(disp_c) + 1)
+            disp_c.index.name = "#"
+            st.dataframe(disp_c, use_container_width=True, height=400)
+            st.caption(
+                f"Toplam: {len(clean_df)} satır "
+                f"| Min: {clean_df['value'].min():.2f} "
+                f"| Max: {clean_df['value'].max():.2f}"
+            )
+        else:
+            st.info("CSV yüklendi — ground truth mevcut değil")
+
+    if clean_df is not None and corrupted_df is not None:
         st.plotly_chart(
             _plot_clean_vs_corrupted(clean_df, corrupted_df),
-            use_container_width=True,
-        )
-    elif corrupted_df is not None:
-        st.plotly_chart(
-            plot_signal(corrupted_df, title="Corrupted Signal (preview)"),
             use_container_width=True,
         )
     st.stop()
@@ -340,26 +369,85 @@ gt_mask = st.session_state.get("gt_mask", gt_mask)
 if not results:
     st.stop()
 
-# --- Clean vs Corrupted comparison (if synthetic) ---------------------------
+# --- 1. Data tables (side by side) ------------------------------------------
+st.markdown("### 📡 Veri Önizleme")
+col_left, col_right = st.columns(2)
+
+with col_left:
+    st.markdown("#### ☢️ Radyasyonlu Veri")
+    if corrupted_df is not None:
+        disp = corrupted_df[["timestamp", "value"]].head(50).copy()
+        disp.index = range(1, len(disp) + 1)
+        disp.index.name = "#"
+        st.dataframe(disp, use_container_width=True, height=400)
+        nan_n = int(corrupted_df["value"].isna().sum())
+        vmin = corrupted_df["value"].min()
+        vmax = corrupted_df["value"].max()
+        st.caption(
+            f"Toplam: {len(corrupted_df)} satır | NaN: {nan_n} "
+            f"| Min: {vmin:.2f} | Max: {vmax:.2f}"
+        )
+
+with col_right:
+    st.markdown("#### ✅ Temiz Veri (Ground Truth)")
+    if clean_df is not None:
+        disp_c = clean_df[["timestamp", "value"]].head(50).copy()
+        disp_c.index = range(1, len(disp_c) + 1)
+        disp_c.index.name = "#"
+        st.dataframe(disp_c, use_container_width=True, height=400)
+        st.caption(
+            f"Toplam: {len(clean_df)} satır "
+            f"| Min: {clean_df['value'].min():.2f} "
+            f"| Max: {clean_df['value'].max():.2f}"
+        )
+    else:
+        st.info("CSV yüklendi — ground truth mevcut değil")
+
 if clean_df is not None:
     st.plotly_chart(
         _plot_clean_vs_corrupted(clean_df, corrupted_df),
         use_container_width=True,
     )
 
-# --- Pipeline log panel -----------------------------------------------------
-if all_logs:
-    st.markdown("### 📋 Pipeline Log")
-    log_tabs = st.tabs([f"📝 {m.upper()}" for m in all_logs])
-    for tab, (method, logs) in zip(log_tabs, all_logs.items()):
-        with tab:
-            log_text = "\n".join(logs) if logs else "(boş log)"
-            st.code(log_text, language="bash")
+# --- 2. Pipeline log (formatted with icons) --------------------------------
+_ICON_MAP = [
+    ("Ingestion",      "📥"), ("load_data",     "📥"), ("preprocess",     "📥"),
+    ("Detrend",        "📉"), ("detrend",       "📉"),
+    ("Z-score",        "📊"), ("zscore",        "📊"),
+    ("Range",          "🚫"), ("range",         "🚫"),
+    ("Delta",          "⚡"), ("delta",         "⚡"),
+    ("Gap",            "🕳️"), ("gap",           "🕳️"),
+    ("Sliding",        "📐"), ("sliding",       "📐"),
+    ("Isolation",      "🌲"), ("isolation",     "🌲"),
+    ("LSTM",           "🧠"), ("lstm",          "🧠"),
+    ("Hybrid",         "🗳️"), ("hybrid",        "🗳️"),
+    ("Ensemble",       "🗳️"), ("ensemble",      "🗳️"),
+    ("Pyramid",        "🔺"), ("pyramid",       "🔺"),
+    ("Interpolation",  "🔗"), ("interpolation", "🔗"),
+    ("Median",         "🧹"), ("median",        "🧹"),
+    ("Validation",     "✅"), ("validation",    "✅"), ("validate", "✅"),
+    ("Pipeline complete", "🏁"), ("complete",   "🏁"),
+    ("ERROR",          "❌"),
+]
 
-# --- Triple overlay per method ----------------------------------------------
+if all_logs:
+    st.markdown("### 📋 Pipeline İşlem Logu")
+    for method, logs in all_logs.items():
+        st.markdown(f"**🔧 Method: `{method}`**")
+        formatted = []
+        for line in logs:
+            icon = "   "
+            for keyword, ic in _ICON_MAP:
+                if keyword in line:
+                    icon = ic
+                    break
+            formatted.append(f"{icon} {line}")
+        st.code("\n".join(formatted) if formatted else "(boş log)", language="bash")
+
+# --- 3. Triple overlay per method ------------------------------------------
 valid_results = {m: r for m, r in results.items() if r.get("error") is None}
 if valid_results:
-    st.markdown("### 📊 Ground Truth vs Bozuk vs Temizlenmiş")
+    st.markdown("### 📊 Sonuç: Ground Truth vs Bozuk vs Temizlenmiş")
     for method, res in valid_results.items():
         st.plotly_chart(
             _plot_triple_overlay(
