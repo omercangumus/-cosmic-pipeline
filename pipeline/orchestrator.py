@@ -23,7 +23,7 @@ HARD_DETECTORS = {"gaps", "range", "delta", "flatline", "duplicates"}
 
 DEFAULT_CONFIG = {
     "dsp_detector": {
-        "zscore_threshold": 2.0,
+        "zscore_threshold": 3.0,
         "window": 50,
         "window_threshold": 3.0,
         "max_gap_seconds": 60,
@@ -39,7 +39,7 @@ DEFAULT_CONFIG = {
         "min_agreement": 2,
     },
     "classic_filter": {
-        "median_window": 5,
+        "median_window": 7,
     },
 }
 

@@ -1,7 +1,7 @@
 # Cosmic Pipeline — Default Configuration
 
 dsp_detector:
-  zscore_threshold: 2.0          # Z-score anomali esigi (2.0 = mean +/- 2 std)
+  zscore_threshold: 3.0          # Z-score anomali esigi (3.0 = mean +/- 3 std)
   window: 50                     # Sliding window boyutu
   window_threshold: 3.0          # Sliding window anomali esigi
   max_gap_seconds: 60            # Maks izin verilen timestamp boslugu (saniye)
@@ -18,7 +18,7 @@ ensemble:
   min_agreement: 2               # Soft dedektorler arasi minimum anlasma
 
 classic_filter:
-  median_window: 5               # Median filtre pencere boyutu (tek sayi)
+  median_window: 7               # Median filtre pencere boyutu (tek sayi)
 
 logging:
   level: "INFO"

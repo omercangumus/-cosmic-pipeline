@@ -8,8 +8,8 @@ def test_partial_config_merge():
     partial = {"ensemble": {"min_agreement": 3}}
     merged = _deep_merge(DEFAULT_CONFIG, partial)
     assert merged["ensemble"]["min_agreement"] == 3
-    assert merged["dsp_detector"]["zscore_threshold"] == 2.0
-    assert merged["classic_filter"]["median_window"] == 5
+    assert merged["dsp_detector"]["zscore_threshold"] == 3.0
+    assert merged["classic_filter"]["median_window"] == 7
 
 
 def test_empty_config_uses_defaults():
