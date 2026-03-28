@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from data.synthetic_generator import FaultConfig, generate_corrupted_dataset, generate_clean_signal
-from pipeline.orchestrator import run_pipeline
+from pipeline.orchestrator import run_pipeline, run_pipeline_multi
 
 logging.basicConfig(level=logging.INFO)
 
@@ -153,6 +153,49 @@ def _plot_detector_breakdown(detector_masks, corrupted_df):
     return fig
 
 
+def _plot_multi_channel(multi_result):
+    """Build subplot figure with one row per channel."""
+    channels = multi_result["channels"]
+    valid = {k: v for k, v in channels.items() if "error" not in v}
+    n = len(valid)
+    if n == 0:
+        return go.Figure()
+
+    fig = make_subplots(
+        rows=n, cols=1, shared_xaxes=True,
+        subplot_titles=[f"{col} ({v['metrics']['faults_detected']} anomali)" for col, v in valid.items()],
+        vertical_spacing=0.06,
+    )
+    colors = ["#f59e0b", "#00d4ff", "#22c55e", "#8b5cf6", "#ef4444",
+              "#ec4899", "#06b6d4", "#3b82f6", "#eab308", "#f97316"]
+    for i, (col, res) in enumerate(valid.items(), 1):
+        cleaned = res["cleaned_data"]
+        fig.add_trace(go.Scatter(
+            x=cleaned["timestamp"], y=cleaned["value"],
+            mode="lines", name=col,
+            line=dict(color=colors[(i - 1) % len(colors)], width=1),
+            showlegend=True,
+        ), row=i, col=1)
+        fm = res["fault_mask"]
+        if fm.any():
+            idx = np.where(fm.values)[0]
+            fig.add_trace(go.Scatter(
+                x=cleaned["timestamp"].iloc[idx],
+                y=cleaned["value"].iloc[idx],
+                mode="markers", name=f"{col} anomali",
+                marker=dict(color="#ff4444", size=3, symbol="x"),
+                showlegend=False,
+            ), row=i, col=1)
+
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_GRID,
+        height=max(300, 200 * n), showlegend=True,
+        legend=dict(orientation="h", y=-0.05),
+        margin=dict(t=30, b=50, l=60, r=30),
+    )
+    return fig
+
+
 # ── Log formatter ──────────────────────────────────────────────────────────────
 
 def _format_pipeline_log(logs, method, result=None):
@@ -282,22 +325,92 @@ def generate_data(n_samples, seed, seu_count, tid_slope, gap_count, noise_max):
 
 
 def upload_csv(file):
+    empty_update = gr.update(choices=[], value=[], visible=False)
     if file is None:
-        return None, None, None, "Dosya secilmedi"
+        return None, None, None, "Dosya secilmedi", empty_update
     try:
-        from utils.csv_parser import parse_uploaded_csv
+        fname = Path(file.name).name
+        raw_df = None
+        # Try reading raw file to detect multi-column
+        try:
+            suffix = fname.lower().rsplit(".", 1)[-1]
+            if suffix in ("xlsx", "xls"):
+                raw_df = pd.read_excel(file.name)
+            elif suffix == "json":
+                raw_df = pd.read_json(file.name)
+            elif suffix == "tsv":
+                raw_df = pd.read_csv(file.name, sep="\t")
+            else:
+                raw_df = pd.read_csv(file.name)
+        except Exception:
+            pass
 
+        # Detect numeric columns (exclude timestamp/label)
+        time_aliases = {"timestamp", "time_tag", "date", "datetime", "time", "ds"}
+        numeric_cols = []
+        if raw_df is not None:
+            numeric_cols = [
+                c for c in raw_df.select_dtypes(include=["number"]).columns
+                if c.lower() not in time_aliases and c != "label"
+            ]
+
+        if len(numeric_cols) > 1:
+            # Multi-column CSV — store raw df for multi-channel processing
+            # Resolve timestamp
+            time_col = None
+            for alias in time_aliases:
+                if alias in raw_df.columns:
+                    time_col = alias
+                    break
+            if time_col:
+                raw_df["timestamp"] = pd.to_datetime(raw_df[time_col], errors="coerce")
+            else:
+                raw_df["timestamp"] = pd.date_range("2024-01-01", periods=len(raw_df), freq="1s")
+
+            _state["raw_multi"] = raw_df
+            _state["multi_columns"] = numeric_cols
+            # Also set single-column fallback (first numeric col)
+            first_col = numeric_cols[0]
+            df = raw_df[["timestamp", first_col]].rename(columns={first_col: "value"}).copy()
+            df["value"] = pd.to_numeric(df["value"], errors="coerce")
+            df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+            _state["corrupted"] = df
+            _state["clean"] = None
+            _state["gt_mask"] = None
+
+            table = raw_df[["timestamp"] + numeric_cols[:5]].head(50)
+            fig = go.Figure()
+            for i, col in enumerate(numeric_cols[:5]):
+                fig.add_trace(go.Scatter(
+                    x=raw_df["timestamp"], y=raw_df[col],
+                    mode="lines", name=col, opacity=0.7,
+                ))
+            fig.update_layout(
+                template=_TEMPLATE, paper_bgcolor=_BG,
+                plot_bgcolor=_GRID, height=350,
+            )
+            col_update = gr.update(choices=numeric_cols, value=numeric_cols[:3], visible=True)
+            return (
+                fig, None, table,
+                f"OK — {len(raw_df)} satir, {len(numeric_cols)} kanal: {', '.join(numeric_cols[:5])}{'...' if len(numeric_cols) > 5 else ''}",
+                col_update,
+            )
+
+        # Single-column: use csv_parser (handles normalization)
+        from utils.csv_parser import parse_uploaded_csv
         with open(file.name, "rb") as f:
             raw = f.read()
         encoded = base64.b64encode(raw).decode()
         contents = f"data:text/csv;base64,{encoded}"
-        df, error = parse_uploaded_csv(contents, Path(file.name).name)
+        df, error = parse_uploaded_csv(contents, fname)
         if error:
-            return None, None, None, f"HATA: {error}"
+            return None, None, None, f"HATA: {error}", empty_update
 
         _state["corrupted"] = df
         _state["clean"] = None
         _state["gt_mask"] = None
+        _state.pop("raw_multi", None)
+        _state.pop("multi_columns", None)
 
         table = df[["timestamp", "value"]].head(50)
         fig = go.Figure()
@@ -310,22 +423,123 @@ def upload_csv(file):
             template=_TEMPLATE, paper_bgcolor=_BG,
             plot_bgcolor=_GRID, height=350,
         )
-        return fig, None, table, f"OK — {len(df)} satir yuklendi"
+        return fig, None, table, f"OK — {len(df)} satir yuklendi", empty_update
     except Exception as e:
-        return None, None, None, f"HATA: {e}"
+        return None, None, None, f"HATA: {e}", empty_update
 
 
-def run_pipeline_ui(method):
+def run_pipeline_ui(method, selected_columns):
     if "corrupted" not in _state:
-        return None, "Once veri uretin veya yukleyin.", None, "", None, ""
+        return None, "Once veri uretin veya yukleyin.", None, "", None, "", None, ""
 
-    corrupted = _state["corrupted"]
     clean = _state.get("clean")
+    raw_multi = _state.get("raw_multi")
+
+    # ── Multi-channel mode ──
+    if raw_multi is not None and selected_columns and len(selected_columns) > 1:
+        try:
+            handler = _LogCapture()
+            handler.setLevel(logging.INFO)
+            handler.t0 = time.time()
+            for name in _PIPELINE_LOGGERS:
+                logging.getLogger(name).addHandler(handler)
+                logging.getLogger(name).setLevel(logging.INFO)
+            try:
+                multi_result = run_pipeline_multi(
+                    raw_multi, method=method, columns=selected_columns,
+                )
+            finally:
+                for name in _PIPELINE_LOGGERS:
+                    logging.getLogger(name).removeHandler(handler)
+        except Exception as e:
+            return None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
+
+        summary = multi_result["summary"]
+        channels = multi_result["channels"]
+
+        # Store first valid channel as primary result for other tabs
+        first_valid = next((v for v in channels.values() if "error" not in v), None)
+        if first_valid:
+            _state["result"] = first_valid
+        _state["method"] = method
+
+        # Multi-channel plot
+        fig_overlay = _plot_multi_channel(multi_result)
+
+        # Combined log
+        log_lines = [
+            "=" * 45,
+            f"  MULTI-CHANNEL Pipeline — {summary['total_channels']} kanal",
+            "=" * 45, "",
+        ]
+        for col, res in channels.items():
+            if "error" in res:
+                log_lines.append(f"[{col}] HATA: {res['error']}")
+            else:
+                m = res["metrics"]
+                counts = res.get("detector_counts", {})
+                active = ", ".join(f"{k}:{v}" for k, v in counts.items() if v > 0)
+                log_lines.append(f"[{col}] {m['faults_detected']} anomali | {active}")
+        log_lines.extend(["", f"Toplam: {summary['total_faults']} anomali | Sure: {summary['processing_time']:.2f}s"])
+        log_text = "\n".join(log_lines)
+
+        metrics_text = " | ".join(
+            f"{col}: {summary['per_channel'].get(col, 0)}"
+            for col in selected_columns
+        ) + f" | Toplam: {summary['total_faults']} | Sure: {summary['processing_time']:.2f}s"
+
+        # Detector breakdown from first valid channel
+        fig_detectors = go.Figure()
+        if first_valid:
+            try:
+                corrupted_first = _state["corrupted"]
+                from pipeline.detector_classic import detect_all
+                from pipeline.filters_classic import detrend_signal
+                data_dt = detrend_signal(corrupted_first)
+                det_masks = detect_all(data_dt, df_original=corrupted_first)
+                fig_detectors = _plot_detector_breakdown(det_masks, corrupted_first)
+            except Exception:
+                pass
+
+        # Fault timeline from all channels
+        ft_rows = []
+        for col, res in channels.items():
+            if "error" not in res:
+                ft = res.get("fault_timeline", pd.DataFrame())
+                if not ft.empty:
+                    ft = ft.copy()
+                    ft.insert(0, "channel", col)
+                    ft_rows.append(ft)
+        if ft_rows:
+            ft_display = pd.concat(ft_rows, ignore_index=True).head(100)
+        else:
+            ft_display = pd.DataFrame({"Bilgi": ["Anomali bulunamadi"]})
+
+        rv_text = "Multi-channel: " + ", ".join(
+            f"{col}: {'OK' if res.get('repair_verification', {}).get('passed', True) else 'SORUN'}"
+            for col, res in channels.items() if "error" not in res
+        )
+
+        tracer_table = first_valid.get("tracer_table", pd.DataFrame()) if first_valid else pd.DataFrame()
+        tracer_summary = first_valid.get("tracer_summary", "") if first_valid else ""
+
+        return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
+
+    # ── Single-channel mode ──
+    corrupted = _state["corrupted"]
+
+    # If a single column is selected from multi-col CSV, use it
+    if raw_multi is not None and selected_columns and len(selected_columns) == 1:
+        col = selected_columns[0]
+        corrupted = raw_multi[["timestamp", col]].rename(columns={col: "value"}).copy()
+        corrupted["value"] = pd.to_numeric(corrupted["value"], errors="coerce")
+        corrupted = corrupted.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+        _state["corrupted"] = corrupted
 
     try:
         result, logs = _run_with_logs(corrupted, method)
     except Exception as e:
-        return None, f"Pipeline hatasi: {e}", None, "", None, ""
+        return None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
 
     _state["result"] = result
     _state["method"] = method
@@ -425,6 +639,10 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                     gr.Markdown("### CSV Yukle")
                     csv_file = gr.File(label="CSV/TSV/Excel/JSON", file_types=[".csv", ".tsv", ".xlsx", ".xls", ".json"])
                     btn_csv = gr.Button("📁 CSV Yukle")
+                    chk_columns = gr.CheckboxGroup(
+                        choices=[], value=[], visible=False,
+                        label="Kanallar (Multi-Channel)",
+                    )
 
                     txt_status = gr.Textbox(label="Durum", interactive=False)
 
@@ -446,7 +664,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
             btn_csv.click(
                 fn=upload_csv,
                 inputs=[csv_file],
-                outputs=[plot_preview, tbl_clean, tbl_corrupt, txt_status],
+                outputs=[plot_preview, tbl_clean, tbl_corrupt, txt_status, chk_columns],
             )
 
         # ── TAB 2: Pipeline ──────────────────────────
@@ -487,7 +705,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
             btn_run.click(
                 fn=run_pipeline_ui,
-                inputs=[radio_method],
+                inputs=[radio_method, chk_columns],
                 outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
             )
 

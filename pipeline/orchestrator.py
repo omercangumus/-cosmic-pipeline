@@ -284,3 +284,111 @@ def _build_fault_timeline(
         })
 
     return pd.DataFrame(rows, columns=["timestamp", "fault_type", "severity", "reason"])
+
+
+# ── Multi-channel wrapper ─────────────────────────────────────────────────────
+
+_TIME_ALIASES = ("timestamp", "time_tag", "date", "datetime", "time", "ds")
+
+
+def run_pipeline_multi(
+    df: pd.DataFrame,
+    config: dict | None = None,
+    method: str = "classic",
+    columns: list[str] | None = None,
+) -> dict:
+    """
+    Multi-channel pipeline: run pipeline separately for each numeric column.
+
+    Args:
+        df: DataFrame with a timestamp column + N numeric columns.
+        config: Pipeline configuration dict.
+        method: Detection method — 'classic', 'ml', or 'both'.
+        columns: Specific columns to process. If None, all numeric columns.
+
+    Returns:
+        {
+            'channels': {col_name: run_pipeline() result, ...},
+            'summary': {
+                'total_channels': int,
+                'total_faults': int,
+                'processing_time': float,
+                'per_channel': {col: faults_detected, ...},
+            },
+        }
+    """
+    t_start = time.perf_counter()
+
+    # Resolve timestamp column
+    time_col = None
+    for alias in _TIME_ALIASES:
+        if alias in df.columns:
+            time_col = alias
+            break
+
+    if time_col is None:
+        df = df.copy()
+        df["timestamp"] = pd.date_range("2024-01-01", periods=len(df), freq="1s")
+        time_col = "timestamp"
+
+    # Resolve numeric columns
+    exclude = {time_col, "label", "timestamp"}
+    available = [c for c in df.select_dtypes(include=["number"]).columns if c not in exclude]
+
+    if columns:
+        numeric_cols = [c for c in columns if c in available]
+        if not numeric_cols:
+            raise ValueError(f"None of {columns} found in numeric columns: {available}")
+    else:
+        numeric_cols = available
+
+    if not numeric_cols:
+        raise ValueError("No numeric columns found for pipeline processing")
+
+    # Single-column shortcut
+    if len(numeric_cols) == 1:
+        col = numeric_cols[0]
+        single_df = df[[time_col, col]].rename(
+            columns={time_col: "timestamp", col: "value"},
+        )
+        result = run_pipeline(single_df, config=config, method=method)
+        return {
+            "channels": {col: result},
+            "summary": {
+                "total_channels": 1,
+                "total_faults": result["metrics"]["faults_detected"],
+                "processing_time": time.perf_counter() - t_start,
+                "per_channel": {col: result["metrics"]["faults_detected"]},
+            },
+        }
+
+    # Multi-channel: run pipeline per column
+    channels: dict[str, dict] = {}
+    total_faults = 0
+    per_channel: dict[str, int] = {}
+
+    for col in numeric_cols:
+        logger.info("Processing channel: %s", col)
+        channel_df = df[[time_col, col]].copy()
+        channel_df.columns = ["timestamp", "value"]
+
+        try:
+            result = run_pipeline(channel_df, config=config, method=method)
+            channels[col] = result
+            faults = result["metrics"]["faults_detected"]
+            total_faults += faults
+            per_channel[col] = faults
+        except Exception as e:
+            logger.error("Channel %s failed: %s", col, e)
+            channels[col] = {"error": str(e)}
+            per_channel[col] = -1
+
+    return {
+        "channels": channels,
+        "summary": {
+            "total_channels": len(numeric_cols),
+            "total_faults": total_faults,
+            "processing_time": time.perf_counter() - t_start,
+            "per_channel": per_channel,
+        },
+    }

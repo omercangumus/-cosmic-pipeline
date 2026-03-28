@@ -86,6 +86,11 @@ docker compose up -d                 # Docker ile calistirma
 - print() yerine logging
 - Config degerleri fonksiyon parametresi olsun, hardcode etme
 
+## Multi-Channel Support
+- `run_pipeline_multi()` wrapper: her numeric sutun icin ayri `run_pipeline()` calistirir.
+- Dashboard: CSV upload'da 2+ numeric sutun varsa CheckboxGroup ile kanal secimi sunar.
+- Her kanal bagimsiz detection + filtering + metrics alir, subplot'larla gosterilir.
+
 ## Bilinen Kisitlar
-- **Tek kanal**: Pipeline tek `value` kolonu isliyor. Multi-column CSV'de sadece ilk numeric kolon alinir.
-- Multi-channel support roadmap'te — her kolon icin ayri pipeline calistirma + dashboard multi-channel plot gerekli.
+- **Streaming yok**: Sadece batch processing destekleniyor.
+- **HDF5/Parquet yok**: CSV, TSV, Excel, JSON, netCDF4 destekleniyor.
