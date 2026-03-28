@@ -114,6 +114,11 @@ def run_pipeline(
                 det_mask, data, detector_name=det_name,
             )
 
+    # --- detector counts for dashboard ---
+    detector_counts = {name: int(mask.sum()) for name, mask in detector_masks.items()}
+    for name, count in detector_counts.items():
+        logger.info("Detector '%s': %d anomalies", name, count)
+
     # --- 4. Hybrid Majority Ensemble ---
     logger.info("Step 3: Hybrid ensemble voting (%d detectors)", len(detector_masks))
     ens_cfg = config.get("ensemble", {})
@@ -226,6 +231,7 @@ def run_pipeline(
             "processing_time": processing_time,
         },
         "fault_timeline": fault_timeline,
+        "detector_counts": detector_counts,
         "repair_confidence": repair_confidence,
         "repair_verification": repair_verification,
         "sampling_info": sampling_info,

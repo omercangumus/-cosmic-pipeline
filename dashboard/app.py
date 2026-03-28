@@ -167,20 +167,10 @@ def _format_pipeline_log(logs, method, result=None):
         "delta": 0, "flatline": 0, "duplicates": 0,
         "isolation_forest": 0, "lstm_ae": 0,
     }
-    kw_map = {
-        "zscore": "Z-score", "sliding_window": "Sliding window",
-        "gaps": "Gap detection", "range": "Range violation",
-        "delta": "Delta spike", "flatline": "Flatline",
-        "duplicates": "Duplicate", "isolation_forest": "Isolation",
-        "lstm_ae": "LSTM",
-    }
-    for line in logs:
-        for key, kw in kw_map.items():
-            if kw in line and "detected" in line:
-                for part in line.split():
-                    if part.isdigit():
-                        st[key] = int(part)
-                        break
+    # Use detector_counts from pipeline result (reliable) instead of log parsing
+    if result and "detector_counts" in result:
+        for key in st:
+            st[key] = result["detector_counts"].get(key, 0)
 
     lines.append("ADIM 1 -- Veri Alimi")
     lines.append("   Veri yuklendi ve on isleme tamamlandi.")
