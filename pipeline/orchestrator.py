@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 VALID_METHODS = ("classic", "ml", "both")
 
 # Detectors whose output is treated as "hard" (any-True → anomaly)
-HARD_DETECTORS = {"gaps", "range", "delta"}
+HARD_DETECTORS = {"gaps", "range", "delta", "flatline", "duplicates"}
 
 
 def run_pipeline(
@@ -125,7 +125,7 @@ def run_pipeline(
     _empty = pd.Series(dtype=bool)
     layer1_count = sum(
         int(detector_masks.get(k, _empty).sum())
-        for k in ["gaps", "range", "delta"] if k in detector_masks
+        for k in ["gaps", "range", "delta", "flatline", "duplicates"] if k in detector_masks
     )
     layer2_count = (
         int(detector_masks.get("zscore", _empty).sum())
@@ -157,6 +157,10 @@ def run_pipeline(
     faults_corrected = faults_detected
 
     fault_timeline = _build_fault_timeline(data, detector_masks, fault_mask)
+
+    # Repair eligibility assessment
+    from pipeline.validator import assess_repair_eligibility
+    fault_timeline = assess_repair_eligibility(data, fault_mask, fault_timeline)
 
     logger.info(
         "Pipeline complete (method=%s): %d faults detected, %.3fs elapsed",
@@ -200,7 +204,7 @@ def _build_fault_timeline(
         severity = len(types) / max(len(detector_masks), 1)
         ts = data["timestamp"].iloc[idx] if "timestamp" in data.columns else idx
 
-        if any(t in ("gaps", "range", "delta") for t in types):
+        if any(t in ("gaps", "range", "delta", "flatline", "duplicates") for t in types):
             reason = "hard_rule"
         elif any(t in ("zscore", "sliding_window") for t in types):
             reason = "statistical"

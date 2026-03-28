@@ -157,3 +157,63 @@ def _snr_db(signal: np.ndarray, noise: np.ndarray) -> float:
     if noise_power < 1e-20:
         return float("inf")
     return float(10 * np.log10(signal_power / noise_power))
+
+
+def assess_repair_eligibility(
+    df: pd.DataFrame,
+    fault_mask: pd.Series,
+    fault_timeline: pd.DataFrame,
+    max_gap_ratio: float = 0.3,
+) -> pd.DataFrame:
+    """
+    Decide repair action for each anomaly: repair / flag_only / preserve.
+
+    Decision logic:
+      - repair: Hard-rule anomaly or sufficient detector agreement.
+      - flag_only: Overall fault ratio too high — bulk repair is risky.
+      - preserve: Low severity (single detector), may be a real event.
+
+    Args:
+        df: Original DataFrame.
+        fault_mask: Boolean anomaly mask.
+        fault_timeline: Fault timeline with reason and severity columns.
+        max_gap_ratio: If fault ratio exceeds this, use flag_only.
+
+    Returns:
+        fault_timeline with an added 'repair_decision' column.
+    """
+    result = fault_timeline.copy()
+
+    if result.empty:
+        result["repair_decision"] = pd.Series(dtype=str)
+        return result
+
+    total_points = len(df)
+    total_faults = int(fault_mask.sum())
+    fault_ratio = total_faults / max(total_points, 1)
+
+    decisions: list[str] = []
+    for _, row in result.iterrows():
+        reason = row.get("reason", "unknown")
+        severity = row.get("severity", 0)
+
+        if reason == "hard_rule":
+            decisions.append("repair")
+        elif fault_ratio > max_gap_ratio:
+            decisions.append("flag_only")
+        elif severity <= 0.2:
+            decisions.append("preserve")
+        else:
+            decisions.append("repair")
+
+    result["repair_decision"] = decisions
+
+    repair_count = decisions.count("repair")
+    flag_count = decisions.count("flag_only")
+    preserve_count = decisions.count("preserve")
+
+    logger.info(
+        "Repair eligibility: %d repair, %d flag_only, %d preserve (fault_ratio=%.2f)",
+        repair_count, flag_count, preserve_count, fault_ratio,
+    )
+    return result

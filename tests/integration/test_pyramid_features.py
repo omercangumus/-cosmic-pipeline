@@ -171,9 +171,11 @@ class TestPyramidEndToEnd:
             result = run_pipeline(corrupted, method=method)
             ft = result["fault_timeline"]
             assert isinstance(ft, pd.DataFrame)
-            assert list(ft.columns) == [
-                "timestamp", "fault_type", "severity", "reason",
-            ]
+            assert "timestamp" in ft.columns
+            assert "fault_type" in ft.columns
+            assert "severity" in ft.columns
+            assert "reason" in ft.columns
+            assert "repair_decision" in ft.columns
             assert len(ft) > 0
 
     def test_pipeline_with_clean_signal(self):
@@ -192,3 +194,43 @@ class TestPyramidEndToEnd:
             result_corrupted["metrics"]["faults_detected"]
             > result_clean["metrics"]["faults_detected"]
         )
+
+
+class TestRepairEligibility:
+    """Repair eligibility assessment tests."""
+
+    def test_repair_eligibility_column_exists(self):
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        ft = result["fault_timeline"]
+        assert "repair_decision" in ft.columns
+
+    def test_repair_eligibility_valid_values(self):
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        ft = result["fault_timeline"]
+        valid_decisions = {"repair", "flag_only", "preserve"}
+        for d in ft["repair_decision"].unique():
+            assert d in valid_decisions, f"Invalid decision: {d}"
+
+    def test_repair_hard_rules_get_repair(self):
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        ft = result["fault_timeline"]
+        hard_faults = ft[ft["reason"] == "hard_rule"]
+        if len(hard_faults) > 0:
+            assert (hard_faults["repair_decision"] == "repair").all()
+
+    def test_flatline_in_pipeline(self):
+        """Flatline detector should work inside the pipeline."""
+        n = 500
+        values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+        values[200:250] = 7.0  # 50 points stuck
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": values,
+        })
+        result = run_pipeline(df, method="classic")
+        ft = result["fault_timeline"]
+        flatline_faults = ft[ft["fault_type"].str.contains("flatline")]
+        assert len(flatline_faults) > 0, "Flatline not detected in pipeline"

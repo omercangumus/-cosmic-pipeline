@@ -161,6 +161,63 @@ def detect_delta_spike(
     return pd.Series(mask, index=df.index)
 
 
+def detect_flatline(
+    df: pd.DataFrame,
+    min_duration: int = 20,
+    tolerance: float = 1e-6,
+) -> pd.Series:
+    """
+    Detect stuck sensor: consecutive identical values for too long.
+
+    Args:
+        df: DataFrame with a 'value' column.
+        min_duration: Minimum consecutive identical values to flag.
+        tolerance: Maximum difference to consider values identical.
+
+    Returns:
+        Boolean Series (True = flatline detected).
+    """
+    values = df["value"].values.astype(np.float64)
+    n = len(values)
+    mask = np.zeros(n, dtype=bool)
+
+    run_start = 0
+    for i in range(1, n):
+        if abs(values[i] - values[run_start]) > tolerance or not np.isfinite(values[i]):
+            if i - run_start >= min_duration:
+                mask[run_start:i] = True
+            run_start = i
+    if n - run_start >= min_duration:
+        mask[run_start:n] = True
+
+    n_detected = int(mask.sum())
+    logger.info("Flatline (min_duration=%d): %d stuck points detected", min_duration, n_detected)
+    return pd.Series(mask, index=df.index)
+
+
+def detect_duplicates(df: pd.DataFrame) -> pd.Series:
+    """
+    Detect rows with duplicate timestamps.
+
+    Args:
+        df: DataFrame with a 'timestamp' column.
+
+    Returns:
+        Boolean Series (True = duplicate timestamp).
+    """
+    mask = pd.Series(np.zeros(len(df), dtype=bool), index=df.index)
+
+    if "timestamp" not in df.columns:
+        return mask
+
+    duplicated = df["timestamp"].duplicated(keep=False)
+    mask = duplicated.fillna(False).astype(bool)
+
+    n_detected = int(mask.sum())
+    logger.info("Duplicate detection: %d duplicate timestamps found", n_detected)
+    return mask
+
+
 def detect_gaps(
     df: pd.DataFrame, max_gap_seconds: int = 60
 ) -> pd.Series:
@@ -229,6 +286,8 @@ def detect_all(
         "gaps": detect_gaps(gap_source, max_gap_seconds=max_gap_seconds),
         "range": detect_range_violation(gap_source, max_std_multiplier=range_std_multiplier),
         "delta": detect_delta_spike(gap_source, max_delta_multiplier=delta_multiplier),
+        "flatline": detect_flatline(gap_source, min_duration=20),
+        "duplicates": detect_duplicates(gap_source),
     }
 
     total = sum(m.sum() for m in results.values())

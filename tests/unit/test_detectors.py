@@ -7,6 +7,8 @@ import pytest
 from pipeline.detector_classic import (
     detect_all,
     detect_delta_spike,
+    detect_duplicates,
+    detect_flatline,
     detect_gaps,
     detect_outliers_zscore,
     detect_range_violation,
@@ -165,7 +167,7 @@ def test_gaps_no_false_positives(normal_df):
 
 def test_detect_all_returns_all_detectors(normal_df):
     results = detect_all(normal_df)
-    assert set(results.keys()) == {"zscore", "sliding_window", "gaps", "range", "delta"}
+    assert set(results.keys()) == {"zscore", "sliding_window", "gaps", "range", "delta", "flatline", "duplicates"}
     for name, mask in results.items():
         assert isinstance(mask, pd.Series), f"{name} is not a Series"
         assert mask.dtype == bool, f"{name} is not bool dtype"
@@ -177,3 +179,60 @@ def test_detect_all_finds_spikes(spiked_df):
     combined = results["zscore"] | results["range"]
     for idx in spike_indices:
         assert combined.iloc[idx], f"Spike at {idx} not detected by any method"
+
+
+# --- Flatline ---
+
+def test_flatline_detects_stuck_sensor():
+    n = 200
+    values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+    values[50:80] = 5.0  # 30 points same value
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_flatline(df, min_duration=20)
+    assert mask.iloc[60], "Flatline region not detected"
+    assert not mask.iloc[0], "Normal point wrongly flagged"
+
+
+def test_flatline_short_run_not_flagged():
+    n = 100
+    values = np.sin(np.linspace(0, 4 * np.pi, n)) * 10
+    values[50:55] = 5.0
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_flatline(df, min_duration=20)
+    assert mask.iloc[50:55].sum() == 0
+
+
+def test_flatline_entire_constant_signal():
+    n = 100
+    values = np.ones(n) * 42.0
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+        "value": values,
+    })
+    mask = detect_flatline(df, min_duration=20)
+    assert mask.all()
+
+
+# --- Duplicates ---
+
+def test_duplicates_detects_repeated_timestamps():
+    timestamps = pd.date_range("2024-01-01", periods=10, freq="1s").tolist()
+    timestamps[5] = timestamps[4]
+    df = pd.DataFrame({"timestamp": timestamps, "value": range(10)})
+    mask = detect_duplicates(df)
+    assert mask.iloc[4] and mask.iloc[5]
+
+
+def test_duplicates_clean_data():
+    df = pd.DataFrame({
+        "timestamp": pd.date_range("2024-01-01", periods=50, freq="1s"),
+        "value": range(50),
+    })
+    mask = detect_duplicates(df)
+    assert mask.sum() == 0
