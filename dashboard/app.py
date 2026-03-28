@@ -160,8 +160,9 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
                     )
                     game_result = gr.HTML(label="Sonuc")
 
+            _game_abs = str(Path(__file__).parent / "game.html")
             gr.HTML(
-                value='<iframe src="/file=dashboard/game.html" width="100%" height="600" style="border:none; border-radius:12px;"></iframe>',
+                value=f'<iframe src="/file={_game_abs}" width="100%" height="600" style="border:none; border-radius:12px;"></iframe>',
             )
 
             btn_game.click(
@@ -176,5 +177,5 @@ if __name__ == "__main__":
         server_port=7860,
         share=False,
         theme=theme,
-        allowed_paths=["dashboard/game.html"],
+        allowed_paths=[str(Path(__file__).parent / "game.html")],
     )
