@@ -168,7 +168,7 @@ def detect_delta_spike(
 def detect_flatline(
     df: pd.DataFrame,
     min_duration: int = 20,
-    tolerance: float = 1e-6,
+    tolerance: float | None = None,
 ) -> pd.Series:
     """
     Detect stuck sensor: consecutive identical values for too long.
@@ -177,11 +177,19 @@ def detect_flatline(
         df: DataFrame with a 'value' column.
         min_duration: Minimum consecutive identical values to flag.
         tolerance: Maximum difference to consider values identical.
+            If None, auto-computed as max(1e-6, std(values) * 0.01).
 
     Returns:
         Boolean Series (True = flatline detected).
     """
     values = df["value"].values.astype(np.float64)
+
+    # Adaptive tolerance: 1% of signal std, minimum 1e-6
+    if tolerance is None:
+        finite = values[np.isfinite(values)]
+        std = np.std(finite) if len(finite) > 1 else 0.0
+        tolerance = max(1e-6, std * 0.01)
+        logger.debug("Flatline adaptive tolerance: %.6f (std=%.6f)", tolerance, std)
     n = len(values)
     mask = np.zeros(n, dtype=bool)
 
