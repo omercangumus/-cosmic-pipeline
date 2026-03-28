@@ -4,7 +4,7 @@ install:
 	pip install -r requirements.txt
 
 run:
-	streamlit run dashboard/app.py
+	python dashboard/app.py
 
 test:
 	pytest tests/ -v --cov=pipeline --cov=data --cov=models --cov=utils --cov-report=term-missing
@@ -46,4 +46,4 @@ docker-clean:
 
 # Tek komutla build + başlat
 docker-deploy: docker-build docker-run
-	@echo "✅ Dashboard: http://localhost:8501"
+	@echo "Dashboard: http://localhost:7860"
