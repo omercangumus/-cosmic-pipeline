@@ -1,23 +1,24 @@
-# Default pipeline configuration for cosmic-pipeline
+# Cosmic Pipeline — Default Configuration
 
 dsp_detector:
-  zscore_threshold: 2.0
-  sliding_window: 50
-  sliding_window_threshold: 3.0
-  max_gap_seconds: 60
-  range_std_multiplier: 10.0
+  zscore_threshold: 2.0          # Z-score anomali esigi (2.0 = mean +/- 2 std)
+  window: 50                     # Sliding window boyutu
+  window_threshold: 3.0          # Sliding window anomali esigi
+  max_gap_seconds: 60            # Maks izin verilen timestamp boslugu (saniye)
+  range_std_multiplier: 10.0     # Fiziksel limit ihlali esigi (10 std = imkansiz deger)
+  delta_multiplier: 5.0          # Ani sicrama esigi (5x median delta)
+  iforest_contamination: 0.05    # Isolation Forest anomali orani (%5)
 
 lstm_detector:
-  model_path: "models/lstm_ae.pt"
-  contamination: 0.05
-  threshold_percentile: 95
+  model_path: "models/lstm_ae.pt"  # LSTM Autoencoder model dosyasi
+  threshold_percentile: 95.0       # Reconstruction error esigi (95. yuzdede)
 
 ensemble:
-  strategy: "hybrid"
-  min_agreement: 2
+  strategy: "hybrid"             # Ensemble stratejisi (hybrid = hard + soft)
+  min_agreement: 2               # Soft dedektorler arasi minimum anlasma
 
 classic_filter:
-  median_window: 5
+  median_window: 5               # Median filtre pencere boyutu (tek sayi)
 
 logging:
   level: "INFO"
