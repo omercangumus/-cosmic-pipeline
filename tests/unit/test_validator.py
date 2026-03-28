@@ -142,3 +142,138 @@ def test_metrics_keys():
     cleaned = pd.DataFrame({"value": [1.0, 2.0]})
     metrics = calculate_metrics(original, cleaned)
     assert set(metrics.keys()) == {"rmse", "mae", "r2_score", "snr"}
+
+
+# --- calculate_repair_confidence ---
+
+from pipeline.validator import calculate_repair_confidence, verify_repair
+
+
+class TestRepairConfidence:
+
+    def test_clean_signal_full_confidence(self):
+        n = 100
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        conf = calculate_repair_confidence(df, df, mask)
+        assert (conf == 1.0).all()
+
+    def test_fault_points_have_lower_confidence(self):
+        n = 100
+        orig_vals = np.ones(n) * 10.0
+        orig_vals[50] = 9999.0
+        orig = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": orig_vals,
+        })
+        cleaned = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        mask.iloc[50] = True
+        conf = calculate_repair_confidence(orig, cleaned, mask)
+        assert conf.iloc[50] < 1.0
+        assert conf.iloc[0] == 1.0
+
+    def test_confidence_with_detector_masks(self):
+        n = 50
+        orig_vals = np.ones(n) * 10.0
+        orig_vals[25] = 500.0
+        orig = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": orig_vals,
+        })
+        cleaned = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        mask.iloc[25] = True
+        det_masks = {
+            "zscore": mask.copy(),
+            "range": mask.copy(),
+            "delta": mask.copy(),
+        }
+        conf = calculate_repair_confidence(orig, cleaned, mask, det_masks)
+        assert conf.iloc[25] > 0.3
+
+
+# --- verify_repair ---
+
+class TestRepairVerification:
+
+    def test_good_repair_passes(self):
+        n = 100
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        result = verify_repair(df, df, mask)
+        assert result["passed"]
+        assert result["new_nan_count"] == 0
+        assert result["new_inf_count"] == 0
+
+    def test_repair_with_new_nan_fails(self):
+        n = 100
+        orig = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        clean_vals = np.ones(n) * 10.0
+        clean_vals[50] = np.nan
+        cleaned = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": clean_vals,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        mask.iloc[50] = True
+        result = verify_repair(orig, cleaned, mask)
+        assert not result["passed"]
+        assert result["new_nan_count"] > 0
+
+    def test_repair_with_new_inf_fails(self):
+        n = 100
+        orig = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n) * 10.0,
+        })
+        clean_vals = np.ones(n) * 10.0
+        clean_vals[50] = np.inf
+        cleaned = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": clean_vals,
+        })
+        mask = pd.Series(np.zeros(n, dtype=bool))
+        result = verify_repair(orig, cleaned, mask)
+        assert not result["passed"]
+
+
+# --- end-to-end confidence ---
+
+class TestEndToEndConfidence:
+
+    def test_pipeline_returns_confidence(self):
+        from data.synthetic_generator import generate_corrupted_dataset
+        from pipeline.orchestrator import run_pipeline
+
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        assert "repair_confidence" in result
+        assert "repair_verification" in result
+        assert len(result["repair_confidence"]) == len(corrupted)
+        assert result["repair_verification"]["passed"] is not None
+
+    def test_pipeline_confidence_range(self):
+        from data.synthetic_generator import generate_corrupted_dataset
+        from pipeline.orchestrator import run_pipeline
+
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        conf = result["repair_confidence"]
+        assert (conf >= 0.0).all()
+        assert (conf <= 1.0).all()

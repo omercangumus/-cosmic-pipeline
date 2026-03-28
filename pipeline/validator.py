@@ -217,3 +217,168 @@ def assess_repair_eligibility(
         repair_count, flag_count, preserve_count, fault_ratio,
     )
     return result
+
+
+def calculate_repair_confidence(
+    original: pd.DataFrame,
+    cleaned: pd.DataFrame,
+    fault_mask: pd.Series,
+    detector_masks: dict[str, pd.Series] | None = None,
+) -> pd.Series:
+    """
+    Calculate a confidence score (0.0-1.0) for each repaired point.
+
+    Factors:
+      - detector_agreement: How many detectors flagged this point.
+      - neighbor_quality: Are surrounding points clean?
+      - change_magnitude: How large was the correction?
+
+    Non-fault points receive 1.0 (no repair needed).
+
+    Args:
+        original: Original (corrupted) DataFrame.
+        cleaned: Cleaned DataFrame.
+        fault_mask: Boolean anomaly mask.
+        detector_masks: Per-detector masks (optional, improves scoring).
+
+    Returns:
+        Float Series with values in [0.0, 1.0].
+    """
+    n = len(original)
+    confidence = pd.Series(np.ones(n, dtype=np.float64), index=original.index)
+
+    orig_values = original["value"].values.astype(np.float64)
+    clean_values = cleaned["value"].values.astype(np.float64)
+    fault_indices = np.where(fault_mask.values)[0]
+
+    if len(fault_indices) == 0:
+        return confidence
+
+    finite_orig = orig_values[np.isfinite(orig_values)]
+    global_std = float(np.nanstd(finite_orig)) if len(finite_orig) > 1 else 1.0
+    if global_std < 1e-12:
+        global_std = 1.0
+
+    for idx in fault_indices:
+        # Factor 1: Detector agreement (0.0 - 0.4)
+        if detector_masks:
+            n_detectors = len(detector_masks)
+            n_agreed = sum(1 for m in detector_masks.values() if m.iloc[idx])
+            score_agreement = 0.4 * (n_agreed / max(n_detectors, 1))
+        else:
+            score_agreement = 0.2
+
+        # Factor 2: Neighbor quality (0.0 - 0.3)
+        window = 10
+        lo = max(0, idx - window)
+        hi = min(n, idx + window + 1)
+        neighbor_mask = fault_mask.values[lo:hi]
+        clean_ratio = 1.0 - (neighbor_mask.sum() / len(neighbor_mask))
+        score_neighbors = 0.3 * clean_ratio
+
+        # Factor 3: Change magnitude (0.0 - 0.3)
+        if np.isfinite(orig_values[idx]) and np.isfinite(clean_values[idx]):
+            change = abs(orig_values[idx] - clean_values[idx])
+            relative_change = change / global_std
+            score_change = 0.3 * max(0.0, 1.0 - relative_change / 10.0)
+        else:
+            score_change = 0.1
+
+        confidence.iloc[idx] = round(
+            min(1.0, score_agreement + score_neighbors + score_change), 3,
+        )
+
+    mean_conf = float(confidence.iloc[fault_indices].mean())
+    logger.info(
+        "Repair confidence: %d points scored, mean=%.3f, min=%.3f",
+        len(fault_indices), mean_conf, float(confidence.iloc[fault_indices].min()),
+    )
+    return confidence
+
+
+def verify_repair(
+    original: pd.DataFrame,
+    cleaned: pd.DataFrame,
+    fault_mask: pd.Series,
+) -> dict:
+    """
+    Post-repair quality check.
+
+    Checks:
+      - Were new NaN values introduced?
+      - Were new Inf values introduced?
+      - Did variance explode?
+      - Are repaired points within a reasonable range?
+
+    Args:
+        original: Original (corrupted) DataFrame.
+        cleaned: Cleaned DataFrame.
+        fault_mask: Boolean anomaly mask.
+
+    Returns:
+        Dict with keys: passed, issues, new_nan_count, new_inf_count,
+        variance_ratio, out_of_range_repairs.
+    """
+    issues: list[str] = []
+
+    orig_values = original["value"].values.astype(np.float64)
+    clean_values = cleaned["value"].values.astype(np.float64)
+    fault_indices = np.where(fault_mask.values)[0]
+
+    # Check 1: New NaN
+    orig_nan = int(np.isnan(orig_values).sum())
+    clean_nan = int(np.isnan(clean_values).sum())
+    new_nan = max(0, clean_nan - orig_nan)
+    if new_nan > 0:
+        issues.append(f"Repair introduced {new_nan} new NaN values")
+
+    # Check 2: New Inf
+    orig_inf = int(np.isinf(orig_values).sum())
+    clean_inf = int(np.isinf(clean_values).sum())
+    new_inf = max(0, clean_inf - orig_inf)
+    if new_inf > 0:
+        issues.append(f"Repair introduced {new_inf} new Inf values")
+
+    # Check 3: Variance explosion
+    finite_orig = orig_values[np.isfinite(orig_values)]
+    finite_clean = clean_values[np.isfinite(clean_values)]
+
+    if len(finite_orig) > 1 and len(finite_clean) > 1:
+        orig_var = float(np.var(finite_orig))
+        clean_var = float(np.var(finite_clean))
+        variance_ratio = clean_var / max(orig_var, 1e-12)
+        if variance_ratio > 10.0:
+            issues.append(f"Variance increased {variance_ratio:.1f}x after repair")
+    else:
+        variance_ratio = 1.0
+
+    # Check 4: Out-of-range repairs
+    out_of_range = 0
+    if len(finite_clean) > 1 and len(fault_indices) > 0:
+        clean_mean = float(np.nanmean(finite_clean))
+        clean_std = float(np.nanstd(finite_clean))
+        threshold = clean_mean + 10 * clean_std
+
+        for idx in fault_indices:
+            if idx < len(clean_values) and np.isfinite(clean_values[idx]):
+                if abs(clean_values[idx] - clean_mean) > threshold:
+                    out_of_range += 1
+
+        if out_of_range > 0:
+            issues.append(f"{out_of_range} repaired points still out of range")
+
+    passed = len(issues) == 0
+
+    logger.info(
+        "Repair verification: %s (%d issues, %d new NaN, %d new Inf)",
+        "PASSED" if passed else "FAILED", len(issues), new_nan, new_inf,
+    )
+
+    return {
+        "passed": passed,
+        "issues": issues,
+        "new_nan_count": new_nan,
+        "new_inf_count": new_inf,
+        "variance_ratio": round(variance_ratio, 4),
+        "out_of_range_repairs": out_of_range,
+    }

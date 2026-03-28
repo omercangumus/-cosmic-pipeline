@@ -162,6 +162,15 @@ def run_pipeline(
     from pipeline.validator import assess_repair_eligibility
     fault_timeline = assess_repair_eligibility(data, fault_mask, fault_timeline)
 
+    # Repair confidence scoring
+    from pipeline.validator import calculate_repair_confidence, verify_repair
+    repair_confidence = calculate_repair_confidence(
+        data, cleaned_data, fault_mask, detector_masks,
+    )
+
+    # Repair verification
+    repair_verification = verify_repair(data, cleaned_data, fault_mask)
+
     logger.info(
         "Pipeline complete (method=%s): %d faults detected, %.3fs elapsed",
         method, faults_detected, processing_time,
@@ -176,6 +185,8 @@ def run_pipeline(
             "processing_time": processing_time,
         },
         "fault_timeline": fault_timeline,
+        "repair_confidence": repair_confidence,
+        "repair_verification": repair_verification,
     }
 
 
