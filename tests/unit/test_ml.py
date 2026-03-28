@@ -127,10 +127,10 @@ class TestLSTMDetectorNoModel:
         assert len(mask) == 100
 
 
-# === LSTM Filter (without trained model) ===
+# === ML Filter stub (always delegates to interpolation) ===
 
-class TestLSTMFilterNoModel:
-    def test_fallback_to_interpolation(self):
+class TestMLFilterStub:
+    def test_stub_delegates_to_interpolation(self):
         from pipeline.filters_ml import reconstruct_with_lstm
 
         values = np.array([1.0, 2.0, np.nan, np.nan, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
@@ -140,6 +140,6 @@ class TestLSTMFilterNoModel:
         })
         mask = pd.Series([False, False, True, True, False, False, False, False, False, False])
 
-        result = reconstruct_with_lstm(df, mask, model_path="nonexistent/model.pt")
+        result = reconstruct_with_lstm(df, mask)
         assert result["value"].isna().sum() == 0
         assert len(result) == 10

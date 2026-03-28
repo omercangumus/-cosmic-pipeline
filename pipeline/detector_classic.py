@@ -1,10 +1,9 @@
-"""Classic DSP anomaly detection: Z-score, IQR, sliding window, gap detection."""
+"""Classic DSP anomaly detection: Z-score, sliding window, gap detection."""
 
 import logging
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 logger = logging.getLogger(__name__)
 
@@ -49,47 +48,39 @@ def detect_outliers_zscore(
     return mask
 
 
-def detect_outliers_iqr(
-    df: pd.DataFrame, multiplier: float = 1.5
+def detect_range_violation(
+    df: pd.DataFrame, max_std_multiplier: float = 10.0
 ) -> pd.Series:
     """
-    Detect anomalies using Interquartile Range (IQR) method.
-
-    Points outside [Q1 - k*IQR, Q3 + k*IQR] are flagged.
+    Detect physically impossible values (extreme outliers beyond N*std).
 
     Args:
         df: DataFrame with a 'value' column.
-        multiplier: IQR multiplier (1.5 = standard, 3.0 = extreme).
+        max_std_multiplier: Flag values this many stds from the mean.
 
     Returns:
-        Boolean Series (True = anomaly detected).
+        Boolean Series (True = range violation detected).
     """
     values = df["value"].values.astype(np.float64)
-    finite_vals = values[np.isfinite(values)]
+    finite = values[np.isfinite(values)]
 
     mask = pd.Series(np.zeros(len(values), dtype=bool), index=df.index)
-
-    if len(finite_vals) < 4:
-        logger.warning("Not enough finite values for IQR detection")
+    if len(finite) < 2:
         return mask
 
-    q1 = np.percentile(finite_vals, 25)
-    q3 = np.percentile(finite_vals, 75)
-    iqr = q3 - q1
+    mean = np.nanmean(finite)
+    std = np.nanstd(finite)
+    if std < 1e-12:
+        return mask
 
-    lower = q1 - multiplier * iqr
-    upper = q3 + multiplier * iqr
-
-    finite_mask = np.isfinite(values)
-    mask = pd.Series(
-        finite_mask & ((values < lower) | (values > upper)),
-        index=df.index,
-    )
+    threshold = max_std_multiplier * std
+    mask = pd.Series(np.abs(values - mean) > threshold, index=df.index)
+    mask[~np.isfinite(values)] = False
 
     n_detected = mask.sum()
     logger.info(
-        "IQR (k=%.1f): %d anomalies detected [%.2f, %.2f]",
-        multiplier, n_detected, lower, upper,
+        "Range violation (%d*std): %d anomalies detected",
+        max_std_multiplier, n_detected,
     )
     return mask
 
@@ -167,27 +158,28 @@ def detect_gaps(
 def detect_all(
     df: pd.DataFrame,
     zscore_threshold: float = 2.0,
-    iqr_multiplier: float = 1.5,
     window: int = 50,
     window_threshold: float = 3.0,
     max_gap_seconds: int = 60,
+    range_std_multiplier: float = 10.0,
     df_original: pd.DataFrame | None = None,
+    **kwargs,
 ) -> dict[str, pd.Series]:
     """
     Run all classic detectors and return individual masks.
 
     Expects pre-detrended data in *df* for statistical detectors.
-    Gap detection runs on *df_original* (or *df* if not provided)
-    so that NaN positions are preserved.
+    Gap and range detection runs on *df_original* (or *df* if not provided)
+    so that NaN positions and original scale are preserved.
 
     Args:
         df: DataFrame with 'timestamp' and 'value' columns (detrended).
         zscore_threshold: Z-score threshold.
-        iqr_multiplier: IQR multiplier.
         window: Sliding window size.
         window_threshold: Sliding window deviation threshold.
         max_gap_seconds: Maximum allowed timestamp gap.
-        df_original: Original (non-detrended) DataFrame for gap detection.
+        range_std_multiplier: Multiplier for range violation detection.
+        df_original: Original (non-detrended) DataFrame for gap/range detection.
 
     Returns:
         Dict of detector_name → boolean mask.
@@ -196,9 +188,9 @@ def detect_all(
 
     results = {
         "zscore": detect_outliers_zscore(df, threshold=zscore_threshold),
-        "iqr": detect_outliers_iqr(df, multiplier=iqr_multiplier),
         "sliding_window": detect_sliding_window(df, window=window, threshold=window_threshold),
         "gaps": detect_gaps(gap_source, max_gap_seconds=max_gap_seconds),
+        "range": detect_range_violation(gap_source, max_std_multiplier=range_std_multiplier),
     }
 
     total = sum(m.sum() for m in results.values())

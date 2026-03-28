@@ -66,6 +66,58 @@ def ensemble_vote(
     return result
 
 
+def hybrid_majority_vote(
+    hard_masks: list[pd.Series],
+    soft_masks: list[pd.Series],
+    min_agreement: int = 2,
+) -> pd.Series:
+    """
+    Hybrid majority voting.
+
+    Hard masks (gap, range violation): any True → automatic anomaly.
+    Soft masks (z-score, IF, LSTM): at least min_agreement must agree.
+
+    Args:
+        hard_masks: Masks from indisputable detectors (gaps, range).
+        soft_masks: Masks from statistical/ML detectors.
+        min_agreement: Minimum soft detectors that must agree.
+
+    Returns:
+        Combined boolean mask.
+
+    Raises:
+        ValueError: If both lists are empty.
+    """
+    if not hard_masks and not soft_masks:
+        raise ValueError("At least one mask (hard or soft) is required")
+
+    ref = hard_masks[0] if hard_masks else soft_masks[0]
+    n = len(ref)
+
+    # Hard anomalies — any strategy (indisputable corruptions)
+    hard_result = pd.Series(np.zeros(n, dtype=bool), index=ref.index)
+    for m in hard_masks:
+        hard_result = hard_result | m
+
+    # Soft anomalies — majority voting
+    soft_result = pd.Series(np.zeros(n, dtype=bool), index=ref.index)
+    if soft_masks:
+        vote_matrix = np.column_stack([m.values.astype(int) for m in soft_masks])
+        vote_sum = vote_matrix.sum(axis=1)
+        soft_result = pd.Series(vote_sum >= min_agreement, index=ref.index)
+
+    final = hard_result | soft_result
+
+    logger.info(
+        "Hybrid majority: %d hard anomalies, %d soft anomalies (min_agreement=%d), %d total",
+        int(hard_result.sum()),
+        int((soft_result & ~hard_result).sum()),
+        min_agreement,
+        int(final.sum()),
+    )
+    return final
+
+
 def weighted_vote(
     masks: list[pd.Series],
     weights: list[float],

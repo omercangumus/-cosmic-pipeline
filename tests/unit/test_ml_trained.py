@@ -1,4 +1,4 @@
-"""Tests for ML detector and filter using the trained LSTM model."""
+"""Tests for ML detector using the trained LSTM model."""
 
 import numpy as np
 import pandas as pd
@@ -50,31 +50,6 @@ class TestLSTMDetectorTrained:
         loose = detect_with_lstm(df, model_path=MODEL_PATH, threshold_percentile=90)
         strict = detect_with_lstm(df, model_path=MODEL_PATH, threshold_percentile=99)
         assert strict.sum() <= loose.sum()
-
-
-class TestLSTMFilterTrained:
-    def test_corrects_spikes(self, corrupted_signal):
-        from pipeline.filters_ml import reconstruct_with_lstm
-        df, mask = corrupted_signal
-        result = reconstruct_with_lstm(df, mask, model_path=MODEL_PATH)
-        assert abs(result["value"].iloc[100]) < 100
-        assert abs(result["value"].iloc[300]) < 100
-
-    def test_fills_gaps(self, corrupted_signal):
-        from pipeline.filters_ml import reconstruct_with_lstm
-        df, mask = corrupted_signal
-        result = reconstruct_with_lstm(df, mask, model_path=MODEL_PATH)
-        assert result["value"].iloc[600:610].isna().sum() == 0
-
-    def test_preserves_clean_points(self, corrupted_signal):
-        from pipeline.filters_ml import reconstruct_with_lstm
-        df, mask = corrupted_signal
-        result = reconstruct_with_lstm(df, mask, model_path=MODEL_PATH, blend_window=0)
-        clean = ~mask
-        pd.testing.assert_series_equal(
-            result.loc[clean, "value"].reset_index(drop=True),
-            df.loc[clean, "value"].reset_index(drop=True),
-        )
 
 
 class TestDetectAllML:
