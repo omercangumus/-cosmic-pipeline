@@ -129,7 +129,7 @@ def validate_schema(df: pd.DataFrame) -> bool:
     if df.empty:
         raise ValueError("DataFrame is empty")
 
-    if not np.issubdtype(df["value"].dtype, np.number):
+    if not pd.api.types.is_numeric_dtype(df["value"]):
         raise ValueError(f"'value' column must be numeric, got {df['value'].dtype}")
 
     logger.debug("Schema validation passed: %d rows, columns=%s", len(df), list(df.columns))
