@@ -54,6 +54,10 @@ def detect_range_violation(
     """
     Detect physically impossible values (extreme outliers beyond N*std).
 
+    Different from zscore: range catches physically impossible values (10σ+),
+    while zscore catches statistical outliers (2σ+). Range is a hard rule
+    (any violation = anomaly), zscore is soft (needs agreement from another detector).
+
     Args:
         df: DataFrame with a 'value' column.
         max_std_multiplier: Flag values this many stds from the mean.
