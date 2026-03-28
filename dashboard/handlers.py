@@ -13,6 +13,25 @@ import plotly.graph_objects as go
 from data.synthetic_generator import FaultConfig, generate_corrupted_dataset
 from pipeline.orchestrator import run_pipeline, run_pipeline_multi
 
+# ── User-friendly error messages ──────────────────────────────────────────────
+
+_ERROR_MESSAGES = {
+    "Signal length must be": "Sinyal cok kisa. En az 100 veri noktasi gerekli.",
+    "Missing required column": "CSV'de 'timestamp' ve 'value' sutunlari bulunamadi.",
+    "No numeric columns": "CSV'de sayisal sutun bulunamadi.",
+    "CUDA out of memory": "GPU bellegi yetersiz. 'classic' yontemi deneyin.",
+    "No data": "Veri bulunamadi. Lutfen gecerli bir dosya yukleyin.",
+    "Not enough finite": "Yeterli gecerli veri yok. NaN orani cok yuksek.",
+}
+
+
+def _user_friendly_error(e: Exception) -> str:
+    msg = str(e)
+    for key, friendly in _ERROR_MESSAGES.items():
+        if key in msg:
+            return friendly
+    return f"Pipeline hatasi: {msg}"
+
 from dashboard.plots import (
     _BG, _GRID, _TEMPLATE,
     plot_clean_vs_corrupted,
@@ -184,7 +203,7 @@ def generate_data(n_samples, seed, seu_count, tid_slope, gap_count, noise_max):
         )
         return fig, clean_table, corrupted_table, info
     except Exception as e:
-        return None, None, None, f"HATA: {e}"
+        return None, None, None, f"HATA: {_user_friendly_error(e)}"
 
 
 def upload_csv(file):
@@ -283,7 +302,7 @@ def upload_csv(file):
         )
         return fig, None, table, f"OK — {len(df)} satir yuklendi", empty_update
     except Exception as e:
-        return None, None, None, f"HATA: {e}", empty_update
+        return None, None, None, f"HATA: {_user_friendly_error(e)}", empty_update
 
 
 def run_pipeline_ui(method, selected_columns):
@@ -311,7 +330,7 @@ def run_pipeline_ui(method, selected_columns):
                 for name in _PIPELINE_LOGGERS:
                     logging.getLogger(name).removeHandler(handler)
         except Exception as e:
-            return None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
+            return None, _user_friendly_error(e), None, "", None, "", None, ""
 
         summary = multi_result["summary"]
         channels = multi_result["channels"]
@@ -392,7 +411,7 @@ def run_pipeline_ui(method, selected_columns):
     try:
         result, logs = _run_with_logs(corrupted, method)
     except Exception as e:
-        return None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
+        return None, _user_friendly_error(e), None, "", None, "", None, ""
 
     _state["result"] = result
     _state["method"] = method
