@@ -327,12 +327,16 @@ function removeRB(){if(rBeacon){sc.remove(rBeacon);rBeacon=null;}}
 
 /* ============ TARGETS ============ */
 function mkTarget(sh,col){
-  var g=new THREE.Group(),e=new THREE.Color(col).multiplyScalar(0.4).getHex();
-  if(sh==='shield'){g.add(box(.6,.6,.14,col,e));g.add(box(.78,.78,.04,col,e,0.45));var c=box(.18,.18,.18,0xffffff,0xffffff);c.position.z=.09;g.add(c);}
-  else if(sh==='sensor'){var pl=box(.08,.7,.08,0x888888);g.add(pl);var hd=box(.38,.25,.38,col,e);hd.position.y=.5;g.add(hd);var ld=box(.08,.08,.08,0xffffff,0xffffff);ld.position.set(0,.7,.12);ld.userData.blink=true;g.add(ld);}
-  else if(sh==='valve'){g.add(box(.28,.28,.28,0x888888));var wh=box(.45,.45,.06,col,e);wh.rotation.z=Math.PI/4;g.add(wh);var pp=box(.12,.12,.35,0x666666);pp.position.z=.22;g.add(pp);}
-  else if(sh==='antenna'){var vt=box(.08,.6,.08,0x888888);g.add(vt);var hz=box(.45,.08,.08,col,e);hz.position.set(.18,.3,0);g.add(hz);var sg=box(.25,.25,.04,col,col,0.28);sg.position.set(.35,.3,0);sg.userData.signal=true;g.add(sg);}
-  else g.add(box(.65,.65,.65,col,e));
+  var g=new THREE.Group(),e=new THREE.Color(col).multiplyScalar(0.9).getHex();
+  if(sh==='shield'){g.add(box(1.2,1.2,.28,col,e));g.add(box(1.5,1.5,.08,col,e,0.45));var c=box(.35,.35,.35,0xffffff,0xffffff);c.position.z=.18;g.add(c);}
+  else if(sh==='sensor'){var pl=box(.16,1.2,.16,0x888888);g.add(pl);var hd=box(.7,.45,.7,col,e);hd.position.y=.85;g.add(hd);var ld=box(.15,.15,.15,0xffffff,0xffffff);ld.position.set(0,1.15,.2);ld.userData.blink=true;g.add(ld);}
+  else if(sh==='valve'){g.add(box(.5,.5,.5,0x888888));var wh=box(.9,.9,.1,col,e);wh.rotation.z=Math.PI/4;g.add(wh);var pp=box(.2,.2,.6,0x666666);pp.position.z=.4;g.add(pp);}
+  else if(sh==='antenna'){var vt=box(.14,1.1,.14,0x888888);g.add(vt);var hz=box(.85,.14,.14,col,e);hz.position.set(.35,.55,0);g.add(hz);var sg=box(.45,.45,.06,col,col,0.3);sg.position.set(.65,.55,0);sg.userData.signal=true;g.add(sg);}
+  else g.add(box(1.2,1.2,1.2,col,e));
+  // Beacon beam (vertical light pillar)
+  var beam=box(.08,10,.08,col,col,0.22);beam.position.y=5;g.add(beam);
+  // PointLight on target
+  var tl=new THREE.PointLight(col,1.0,10);tl.position.y=1;g.add(tl);
   return g;
 }
 
@@ -342,7 +346,7 @@ function spawnTgts(m){
     var t=mkTarget(m.sh,m.col);var px,pz;
     if(m.zone==='all'){var zns=['center','weather','farm','disaster','comms'];var zc=ZC[zns[i%zns.length]];px=zc.x+(Math.random()-.5)*10;pz=zc.z+(Math.random()-.5)*10;}
     else{var zc2=ZC[m.zone];px=zc2.x+(Math.random()-.5)*10;pz=zc2.z+(Math.random()-.5)*10;}
-    t.position.set(px,1.2,pz);t.userData={isT:true,coll:false,oY:1.2};sc.add(t);tgts.push(t);
+    t.position.set(px,2.0,pz);t.userData={isT:true,coll:false,oY:2.0};sc.add(t);tgts.push(t);
   }
 }
 function clearTgts(){tgts.forEach(function(t){sc.remove(t)});tgts.length=0;}
@@ -438,7 +442,8 @@ function doInteract(){
 
 function goReturn(){
   mPh='return';var m=getMs()[mi],rz=ZC[m.rz];spawnRB(rz.x,rz.z);
-  setGuide('\u2705 Hedefler toplandi! \u{1F3E0} Merkeze don!');updTP(m,'return');
+  var dist=Math.floor(player.position.distanceTo(new THREE.Vector3(rz.x,0,rz.z)));
+  setGuide('\u2705 Tum hedefler toplandi! \u{1F3E0} '+ZN[m.rz]+'na don! '+dist+' blok');updTP(m,'return');
 }
 
 /* ============ COMPASS ============ */
@@ -494,6 +499,7 @@ function showPipeline(m){
 function showBriefing(m){
   phase='briefing';var p=document.getElementById('mp');
   document.getElementById('mt').textContent=m.icon+' '+m.name;document.getElementById('md').textContent=m.desc;
+  document.getElementById('dv-canvas').style.display='block';
   drawDataVis();
   var mx=Math.max(pR.l1,pR.l2,pR.l3,pR.l4,1);
   document.getElementById('prd').innerHTML='<div class="pr"><span>Veri</span><span class="pv">'+pR.dp+'</span></div><div class="pr"><span>Anomali</span><span class="pv">'+pR.faults+' ('+((pR.faults/pR.dp)*100).toFixed(0)+'%)</span></div>';
@@ -581,7 +587,11 @@ function animate(){
       var d2z=Math.floor(Math.sqrt(Math.pow(player.position.x-zc.x,2)+Math.pow(player.position.z-zc.z,2)));
       var nearAny=false;tgts.forEach(function(tg){if(!tg.userData.coll&&player.position.distanceTo(tg.position)<5)nearAny=true;});
       if(nearAny)setGuide('\u{1F3AF} Hedeflere yaklas ve SPACE bas! ('+coll+'/'+tCnt+')');
-      else setGuide('\u{1F4CD} '+(m.zone==='all'?'Tum Bolgeler':ZN[m.zone])+'! '+coll+'/'+tCnt+' toplandı');
+      else setGuide('\u{1F4CD} '+(m.zone==='all'?'Tum Bolgeler':ZN[m.zone])+'! '+coll+'/'+tCnt+' toplandi');
+    } else if(mPh==='return'&&rBeacon){
+      var m2=getMs()[mi],rd=Math.floor(player.position.distanceTo(rBeacon.position));
+      if(rd<4)setGuide('\u{1F3E0} SPACE bas ve teslim et!');
+      else setGuide('\u2705 Hedefler tamam! \u{1F3E0} '+ZN[m2.rz]+'na don! '+rd+' blok');
     }
   }
 
@@ -595,9 +605,10 @@ function animate(){
   else{var ct=player.position.clone().add(camOff.clone().applyAxisAngle(new THREE.Vector3(0,1,0),pAng));cam.position.lerp(ct,4*dt);cam.lookAt(player.position.x,player.position.y+2,player.position.z);}
 
   nearT=false;
-  tgts.forEach(function(tg){if(!tg.userData.coll&&tg.visible){tg.position.y=tg.userData.oY+Math.sin(t*2.5+tg.position.x)*.22;tg.rotation.y=t*2;
-    tg.children.forEach(function(c){if(c.userData.signal){var s2=1+Math.sin(t*4)*.3;c.scale.set(s2,s2,1);}if(c.userData.blink&&c.material){c.material.opacity=.3+Math.sin(t*6)*.7;c.material.transparent=true;}});
-    if(mAct&&player.position.distanceTo(tg.position)<2.8)nearT=true;}});
+  tgts.forEach(function(tg){if(!tg.userData.coll&&tg.visible){tg.position.y=tg.userData.oY+Math.sin(t*2.5+tg.position.x)*.35;tg.rotation.y=t*3;
+    var pulse=1+Math.sin(t*3+tg.position.x)*.08;tg.scale.set(pulse,pulse,pulse);
+    tg.children.forEach(function(c){if(c.userData.signal){var s2=1+Math.sin(t*4)*.4;c.scale.set(s2,s2,1);}if(c.userData.blink&&c.material){c.material.opacity=.3+Math.sin(t*6)*.7;c.material.transparent=true;}});
+    if(mAct&&player.position.distanceTo(tg.position)<3)nearT=true;}});
 
   if(rBeacon){rBeacon.position.y=.8+Math.sin(t*3)*.25;rBeacon.rotation.y=t*1.5;
     rBeacon.children.forEach(function(c){if(c.userData.ring){c.userData.ang+=dt*2;c.position.set(Math.cos(c.userData.ang)*1.2,Math.sin(t*4+c.userData.ang)*.25,Math.sin(c.userData.ang)*1.2);}});
