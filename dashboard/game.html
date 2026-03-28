@@ -526,30 +526,53 @@ function completeMission(){
   mAct=false;mPh='none';phase='complete';removeRB();
   if(document.pointerLockElement)document.exitPointerLock();
   var ms=getMs(),m=ms[mi];var elapsed=(performance.now()-mStart)/1000;
-  var bonus=elapsed<30?Math.floor(m.rew*.5):0,pts=m.rew+bonus;score+=pts;
+  var bonus=elapsed<30?Math.floor(m.rew*.5):0,pts=m.rew+bonus;
+  score+=pts;
+  document.getElementById('hSc').textContent=score;
+  console.log('[completeMission] score='+score+' pts='+pts+' mi='+mi+' stg='+stg);
 
   // Done overlay
-  var ov=document.getElementById('done-overlay');ov.querySelector('h1').textContent='\u2705 '+m.dt;
-  drawDoneVis();ov.style.display='block';
+  var ov=document.getElementById('done-overlay');
+  ov.querySelector('h1').textContent='\u2705 '+m.dt;
+  drawDoneVis();
+  ov.style.display='block';
+  console.log('[completeMission] overlay shown');
   spawnConfetti();
   setGuide('\u{1F3C6} Gorev tamamlandi! +'+pts+' puan!'+(bonus>0?' (hiz +'+bonus+')':''));
 
-  document.getElementById('d'+(stg-1)*4+mi).className='dot dn';mi++;
+  // Progress dots
+  document.getElementById('d'+(stg-1)*4+mi).className='dot dn';
+  mi++;
   if(mi<ms.length)document.getElementById('d'+(stg-1)*4+mi).className='dot ac';
-  document.getElementById('hSc').textContent=score;clearTgts();
+  clearTgts();
+  console.log('[completeMission] mi now='+mi+' total='+ms.length);
 
-  setTimeout(function(){ov.style.display='none';
-    if(mi>=ms.length){stageDone();}
-    else{var p=document.getElementById('mp');
-      document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';document.getElementById('md').textContent=m.dt;
+  var _pts=pts,_bonus=bonus,_score=score,_mi=mi,_msLen=ms.length,_dt=m.dt;
+  setTimeout(function(){
+    console.log('[completeMission:timeout] hiding overlay, mi='+_mi+' msLen='+_msLen);
+    ov.style.display='none';
+    if(_mi>=_msLen){
+      console.log('[completeMission:timeout] -> stageDone');
+      stageDone();
+    } else {
+      console.log('[completeMission:timeout] -> showing next mission panel');
+      var p=document.getElementById('mp');
+      document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
+      document.getElementById('md').textContent=_dt;
       document.getElementById('dv-canvas').style.display='none';
-      document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+pts+(bonus>0?' (hiz +'+bonus+')':'')+'</span></div>';
+      document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
       document.getElementById('prl').innerHTML='';
-      document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+score+'</span></div>';
+      document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
       document.getElementById('mo').textContent='Sonraki gorev hazir';
       document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
-      document.getElementById('mb').onclick=function(){p.style.display='none';document.getElementById('dv-canvas').style.display='block';startNext();};
-      p.style.display='block';}
+      document.getElementById('mb').onclick=function(){
+        p.style.display='none';
+        document.getElementById('dv-canvas').style.display='block';
+        startNext();
+      };
+      p.style.display='block';
+      console.log('[completeMission:timeout] panel displayed');
+    }
   },2500);
 }
 
