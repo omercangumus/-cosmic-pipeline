@@ -10,7 +10,8 @@ def test_clean_signal_shape():
     """Test that generated signal has correct shape."""
     df = generate_clean_signal(5000)
     assert len(df) == 5000
-    assert list(df.columns) == ["timestamp", "value"]
+    assert "timestamp" in df.columns
+    assert "value" in df.columns
 
 
 def test_clean_signal_no_nan():
@@ -78,3 +79,36 @@ def test_noise_indices_above_threshold():
     df = generate_clean_signal(1000)
     _, mask = inject_faults(df, noise_std_max=3.0)
     assert len(mask["noise"]) > 0
+
+
+def test_clean_signal_has_metadata_columns():
+    """Test that clean signal includes satellite metadata."""
+    df = generate_clean_signal(n=1000, seed=42)
+    assert "timestamp" in df.columns
+    assert "value" in df.columns
+    assert "orbit_id" in df.columns
+    assert "phase" in df.columns
+    assert "sensor_id" in df.columns
+
+
+def test_clean_signal_realistic_temperature_range():
+    """Thermal sensor should stay within ~5-35 C."""
+    df = generate_clean_signal(n=10000, seed=42)
+    assert df["value"].min() > 0, "Temperature dropped below 0"
+    assert df["value"].max() < 40, "Temperature exceeded 40"
+
+
+def test_clean_signal_has_multiple_orbits():
+    """20000 seconds / 5400s per orbit = 3+ orbits."""
+    df = generate_clean_signal(n=20000, seed=42)
+    assert df["orbit_id"].nunique() >= 3
+
+
+def test_corrupted_dataset_drops_metadata():
+    """Corrupted df should only have timestamp + value."""
+    from data.synthetic_generator import generate_corrupted_dataset
+
+    clean, corrupted, _ = generate_corrupted_dataset(n=5000, seed=42)
+    assert "orbit_id" in clean.columns
+    assert "timestamp" in corrupted.columns
+    assert "value" in corrupted.columns

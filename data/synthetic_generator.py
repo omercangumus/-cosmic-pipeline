@@ -182,32 +182,76 @@ def _inject_noise_floor(
 
 def generate_clean_signal(n: int = 10000, seed: int = 42) -> pd.DataFrame:
     """
-    Generate a clean synthetic telemetry signal.
+    Generate a realistic satellite telemetry signal.
 
-    Composite signal: base sine wave + linear trend + slow oscillation
-    + minimal background noise.
+    Simulates a thermal sensor on a LEO satellite:
+    - Base temperature ~20 C (spacecraft internal)
+    - Orbital period ~90 min (sinusoidal day/night cycle)
+    - Slow thermal drift (sun angle change over orbits)
+    - Eclipse cooling events (periodic dips)
+    - Minor sensor noise
 
     Args:
         n: Number of samples.
         seed: Random seed for reproducibility.
 
     Returns:
-        DataFrame with columns [timestamp, value].
+        DataFrame with columns [timestamp, value, orbit_id, phase, sensor_id].
+        Pipeline only uses timestamp + value; extras are metadata.
     """
     rng = np.random.default_rng(seed)
 
     timestamps = pd.date_range("2024-01-01", periods=n, freq="1s")
-    t = np.arange(n)
+    t = np.arange(n, dtype=np.float64)
 
-    value = (
-        np.sin(2 * np.pi * 0.01 * t) * 10
-        + t * 0.001
-        + np.sin(2 * np.pi * 0.005 * t) * 2
-        + rng.normal(0, 0.1, n)
+    # Orbital period: ~5400 seconds (90 minutes)
+    orbital_period = 5400.0
+    orbit_phase = (t % orbital_period) / orbital_period  # 0 to 1
+
+    # Base temperature
+    base_temp = 20.0
+
+    # Day/night orbital cycle: +/-8 C sinusoidal
+    orbital_cycle = 8.0 * np.sin(2 * np.pi * t / orbital_period)
+
+    # Slow thermal drift over ~10 orbits
+    long_period = orbital_period * 10
+    thermal_drift = 2.0 * np.sin(2 * np.pi * t / long_period)
+
+    # Eclipse cooling: sharp dip in phase 0.6-0.95
+    eclipse_mask = (orbit_phase > 0.6) & (orbit_phase < 0.95)
+    eclipse_cooling = np.where(
+        eclipse_mask,
+        -3.0 * np.sin(np.pi * (orbit_phase - 0.6) / 0.35),
+        0.0,
     )
 
-    logger.info("Generated clean signal with %d samples", n)
-    return pd.DataFrame({"timestamp": timestamps, "value": value})
+    # Minor sensor noise: +/-0.1 C Gaussian
+    noise = rng.normal(0, 0.1, n)
+
+    value = base_temp + orbital_cycle + thermal_drift + eclipse_cooling + noise
+
+    # Metadata
+    orbit_id = (t // orbital_period).astype(int)
+    phase_labels = np.where(
+        orbit_phase < 0.3, "ascending",
+        np.where(orbit_phase < 0.5, "peak",
+                 np.where(orbit_phase < 0.6, "descending",
+                          np.where(orbit_phase < 0.95, "eclipse", "recovery"))),
+    )
+
+    logger.info(
+        "Generated realistic thermal telemetry: %d samples, %d orbits",
+        n, int(orbit_id[-1]) + 1,
+    )
+
+    return pd.DataFrame({
+        "timestamp": timestamps,
+        "value": value,
+        "orbit_id": orbit_id,
+        "phase": phase_labels,
+        "sensor_id": "THERM-001",
+    })
 
 
 def inject_faults(
@@ -239,7 +283,8 @@ def inject_faults(
     """
     rng = np.random.default_rng(seed)
 
-    corrupted = df.copy()
+    # Only work with timestamp + value for injection
+    corrupted = df[["timestamp", "value"]].copy()
     values = corrupted["value"].values.copy().astype(np.float64)
 
     mask = {

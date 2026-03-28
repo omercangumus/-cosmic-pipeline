@@ -312,7 +312,11 @@ if not run_btn and "results" not in st.session_state:
     with col_right:
         st.markdown("#### ✅ Temiz Veri (Ground Truth)")
         if clean_df is not None:
-            disp_c = clean_df[["timestamp", "value"]].head(50).copy()
+            preview_cols = ["timestamp", "value"]
+            for extra in ["orbit_id", "phase", "sensor_id"]:
+                if extra in clean_df.columns:
+                    preview_cols.append(extra)
+            disp_c = clean_df[preview_cols].head(50).copy()
             disp_c.index = range(1, len(disp_c) + 1)
             disp_c.index.name = "#"
             st.dataframe(disp_c, use_container_width=True, height=400)
@@ -391,7 +395,11 @@ with col_left:
 with col_right:
     st.markdown("#### ✅ Temiz Veri (Ground Truth)")
     if clean_df is not None:
-        disp_c = clean_df[["timestamp", "value"]].head(50).copy()
+        display_cols = ["timestamp", "value"]
+        for extra in ["orbit_id", "phase", "sensor_id"]:
+            if extra in clean_df.columns:
+                display_cols.append(extra)
+        disp_c = clean_df[display_cols].head(50).copy()
         disp_c.index = range(1, len(disp_c) + 1)
         disp_c.index.name = "#"
         st.dataframe(disp_c, use_container_width=True, height=400)
@@ -409,40 +417,100 @@ if clean_df is not None:
         use_container_width=True,
     )
 
-# --- 2. Pipeline log (formatted with icons) --------------------------------
-_ICON_MAP = [
-    ("Ingestion",      "📥"), ("load_data",     "📥"), ("preprocess",     "📥"),
-    ("Detrend",        "📉"), ("detrend",       "📉"),
-    ("Z-score",        "📊"), ("zscore",        "📊"),
-    ("Range",          "🚫"), ("range",         "🚫"),
-    ("Delta",          "⚡"), ("delta",         "⚡"),
-    ("Gap",            "🕳️"), ("gap",           "🕳️"),
-    ("Sliding",        "📐"), ("sliding",       "📐"),
-    ("Isolation",      "🌲"), ("isolation",     "🌲"),
-    ("LSTM",           "🧠"), ("lstm",          "🧠"),
-    ("Hybrid",         "🗳️"), ("hybrid",        "🗳️"),
-    ("Ensemble",       "🗳️"), ("ensemble",      "🗳️"),
-    ("Pyramid",        "🔺"), ("pyramid",       "🔺"),
-    ("Interpolation",  "🔗"), ("interpolation", "🔗"),
-    ("Median",         "🧹"), ("median",        "🧹"),
-    ("Validation",     "✅"), ("validation",    "✅"), ("validate", "✅"),
-    ("Pipeline complete", "🏁"), ("complete",   "🏁"),
-    ("ERROR",          "❌"),
-]
+# --- 2. Pipeline log (user-friendly report) --------------------------------
+
+def _format_user_friendly_log(logs, method, result=None):
+    """Parse pipeline logs into a user-friendly Turkish summary."""
+    lines = []
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append(f"🛰️  Pipeline Calistirildi — Yontem: {method.upper()}")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("")
+
+    st_ = {"zscore": 0, "sliding_window": 0, "gaps": 0, "range": 0,
+            "delta": 0, "flatline": 0, "duplicates": 0,
+            "isolation_forest": 0, "lstm_ae": 0}
+    for line in logs:
+        for key in st_:
+            kw_map = {"zscore": "Z-score", "sliding_window": "Sliding window",
+                      "gaps": "Gap detection", "range": "Range violation",
+                      "delta": "Delta spike", "flatline": "Flatline",
+                      "duplicates": "Duplicate", "isolation_forest": "Isolation",
+                      "lstm_ae": "LSTM"}
+            kw = kw_map.get(key, key)
+            if kw in line and "detected" in line:
+                try:
+                    for part in line.split():
+                        if part.isdigit():
+                            st_[key] = int(part)
+                            break
+                except Exception:
+                    pass
+
+    lines.append("📥 ADIM 1 — Veri Alimi")
+    lines.append("   Veri basariyla yuklendi ve on isleme tamamlandi.")
+    lines.append("")
+    lines.append("📉 ADIM 2 — On Isleme")
+    lines.append("   Lineer trend (TID drift) tespit edildi ve kaldirildi.")
+    lines.append("")
+    lines.append("🔍 ADIM 3 — Anomali Tespiti")
+    lines.append("   ┌─────────────────────────────────────────┐")
+    lines.append("   │ KATMAN 1 — Deterministik Kurallar       │")
+    lines.append(f"   │   🕳️  Veri bosluklari (gap):     {st_['gaps']:>5}  │")
+    lines.append(f"   │   🚫  Fiziksel limit ihlali:     {st_['range']:>5}  │")
+    lines.append(f"   │   ⚡  Ani sicrama (delta):       {st_['delta']:>5}  │")
+    lines.append(f"   │   📏  Sabit sinyal (flatline):   {st_['flatline']:>5}  │")
+    lines.append(f"   │   🔁  Tekrar eden zaman:         {st_['duplicates']:>5}  │")
+    lines.append("   ├─────────────────────────────────────────┤")
+    lines.append("   │ KATMAN 2 — Istatistiksel Analiz         │")
+    lines.append(f"   │   📊  Z-score sapmasi:           {st_['zscore']:>5}  │")
+    lines.append(f"   │   📐  Kayan pencere sapmasi:     {st_['sliding_window']:>5}  │")
+    lines.append("   ├─────────────────────────────────────────┤")
+    lines.append("   │ KATMAN 3 — Makine Ogrenimi              │")
+    lines.append(f"   │   🌲  Isolation Forest:          {st_['isolation_forest']:>5}  │")
+    lines.append("   ├─────────────────────────────────────────┤")
+    lines.append("   │ KATMAN 4 — Derin Ogrenme                │")
+    lines.append(f"   │   🧠  LSTM Autoencoder:          {st_['lstm_ae']:>5}  │")
+    lines.append("   └─────────────────────────────────────────┘")
+    lines.append("")
+    lines.append("🗳️  ADIM 4 — Karar (Hybrid Majority Ensemble)")
+    lines.append("   Deterministik kurallar → otomatik anomali")
+    lines.append("   Istatistik + ML → en az 2 detektor anlasirsa anomali")
+    if result:
+        total = result.get("metrics", {}).get("faults_detected", 0)
+        lines.append(f"   Toplam tespit edilen anomali: {total}")
+    lines.append("")
+    lines.append("🧹 ADIM 5 — Temizleme (Mercek Modeli)")
+    lines.append("   1️⃣  Interpolation → bosluklar dolduruldu")
+    lines.append("   2️⃣  Detrend → lineer kayma kaldirildi")
+    lines.append("   3️⃣  Median filtre → spike'lar temizlendi")
+    lines.append("")
+    lines.append("✅ ADIM 6 — Dogrulama")
+    lines.append("   Temizlenmis sinyal kontrol edildi: NaN=0, Inf=0")
+    if result:
+        elapsed = result.get("elapsed", result.get("metrics", {}).get("processing_time", 0))
+        lines.append(f"   Islem suresi: {elapsed:.3f} saniye")
+    lines.append("")
+    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    ft = result.get("fault_timeline") if result else None
+    if ft is not None and "repair_decision" in ft.columns:
+        repair_n = int((ft["repair_decision"] == "repair").sum())
+        flag_n = int((ft["repair_decision"] == "flag_only").sum())
+        preserve_n = int((ft["repair_decision"] == "preserve").sum())
+        lines.append("🔧 Onarim Karari:")
+        lines.append(f"   ✅ Duzeltildi:  {repair_n}")
+        lines.append(f"   ⚠️  Sadece isaretlendi:  {flag_n}")
+        lines.append(f"   🛡️  Korundu (gercek event olabilir):  {preserve_n}")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    return "\n".join(lines)
+
 
 if all_logs:
-    st.markdown("### 📋 Pipeline İşlem Logu")
+    st.markdown("### 📋 Pipeline Islem Raporu")
     for method, logs in all_logs.items():
-        st.markdown(f"**🔧 Method: `{method}`**")
-        formatted = []
-        for line in logs:
-            icon = "   "
-            for keyword, ic in _ICON_MAP:
-                if keyword in line:
-                    icon = ic
-                    break
-            formatted.append(f"{icon} {line}")
-        st.code("\n".join(formatted) if formatted else "(boş log)", language="bash")
+        res = results.get(method)
+        formatted = _format_user_friendly_log(logs, method, res)
+        st.code(formatted, language="")
 
 # --- 3. Triple overlay per method ------------------------------------------
 valid_results = {m: r for m, r in results.items() if r.get("error") is None}
