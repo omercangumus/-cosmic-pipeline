@@ -105,42 +105,55 @@ def apply_classic_filters(
     **kwargs,
 ) -> pd.DataFrame | tuple[pd.DataFrame, dict]:
     """
-    Apply the layered classic filtering pipeline.
+    Layered repair — only anomalous points are modified.
 
-    Three sequential layers — each step's output feeds the next:
-      1. Interpolate NaN gaps.
-      2. Detrend (remove linear drift from entire signal).
-      3. Median filter (remove spikes from entire signal).
+    Steps:
+      1. Interpolate NaN gaps at fault positions.
+      2. Detrend: compute on full signal, apply only to fault points.
+      3. Median filter: compute on full signal, apply only to fault points.
+
+    Clean points (mask == False) are NEVER modified.
 
     Args:
         df: DataFrame with 'value' column.
-        mask: Boolean mask (True = anomaly). Used to identify gaps.
+        mask: Boolean mask (True = anomaly to repair).
         median_window: Kernel size for median filter.
         return_intermediates: If True, return (result, intermediates_dict).
-        **kwargs: Ignored (backward compatibility for removed SG/wavelet params).
+        **kwargs: Ignored (backward compatibility).
 
     Returns:
         Corrected DataFrame, or (DataFrame, intermediates) if requested.
     """
+    result = df.copy()
+    original_clean = df["value"].values.copy()
     intermediates: dict[str, np.ndarray] = {}
-    intermediates["step_0_raw"] = df["value"].values.copy()
+    intermediates["step_0_raw"] = original_clean.copy()
 
-    # Step 1: Interpolate NaN gaps
-    gap_mask = df["value"].isna()
-    result = interpolate_gaps(df, gap_mask)
+    # Step 1: Interpolate NaN gaps (only NaN positions)
+    nan_mask = result["value"].isna()
+    if nan_mask.any():
+        result = interpolate_gaps(result, nan_mask)
     intermediates["step_1_interpolated"] = result["value"].values.copy()
 
-    # Step 2: Detrend
-    result = detrend_signal(result)
+    # Step 2: Detrend — compute on full signal, apply only to fault points
+    if mask.any():
+        detrended = detrend_signal(result)
+        result.loc[mask, "value"] = detrended.loc[mask, "value"]
     intermediates["step_2_detrended"] = result["value"].values.copy()
 
-    # Step 3: Median filter (entire signal)
-    result = median_filter(result, window=median_window)
+    # Step 3: Median filter — compute on full signal, apply only to fault points
+    if mask.any():
+        filtered = median_filter(result, window=median_window)
+        result.loc[mask, "value"] = filtered.loc[mask, "value"]
     intermediates["step_3_median"] = result["value"].values.copy()
 
+    # Guarantee: clean points with original finite values stay untouched
+    clean_finite = ~mask & np.isfinite(original_clean)
+    result.loc[clean_finite, "value"] = original_clean[clean_finite]
+
     logger.info(
-        "Classic filter pipeline complete: %d gaps filled, %d total points processed",
-        int(gap_mask.sum()), len(df),
+        "Classic filter pipeline complete: %d gaps filled, %d fault points repaired, %d clean preserved",
+        int(nan_mask.sum()), int(mask.sum()), int(clean_finite.sum()),
     )
 
     if return_intermediates:
