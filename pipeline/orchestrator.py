@@ -6,13 +6,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from pipeline.detector_classic import (
-    detect_all as detect_classic,
-    detect_gaps,
-    detect_range_violation,
-    detect_outliers_zscore,
-    detect_sliding_window,
-)
+from pipeline.detector_classic import detect_all as detect_classic
 from pipeline.ensemble import hybrid_majority_vote
 from pipeline.filters_classic import apply_classic_filters
 from pipeline.ingestion import load_data, preprocess, validate_schema

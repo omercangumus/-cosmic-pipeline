@@ -579,6 +579,33 @@ with tab_overview:
                 use_container_width=True,
             )
 
+            # --- Sampling info ---
+            sampling = res.get("sampling_info", {})
+            if sampling:
+                st.markdown("#### 📡 Örnekleme Analizi")
+                s1, s2, s3 = st.columns(3)
+                with s1:
+                    st.metric("Örnekleme Aralığı", f"{sampling.get('detected_interval', 0):.2f}s")
+                with s2:
+                    st.metric("Jitter", f"{sampling.get('jitter_ratio', 0):.2%}")
+                with s3:
+                    st.metric("Büyük Boşluk", sampling.get("n_large_gaps", 0))
+
+            # --- Repair verification ---
+            rv = res.get("repair_verification", {})
+            if rv:
+                status = "✅ Geçti" if rv.get("passed") else "⚠️ Sorun Var"
+                st.markdown(f"#### 🔍 Onarım Doğrulama: {status}")
+                if rv.get("issues"):
+                    for issue in rv["issues"]:
+                        st.warning(issue)
+
+            # --- Repair confidence ---
+            rc = res.get("repair_confidence")
+            if rc is not None and fm.any():
+                mean_conf = float(rc[fm].mean())
+                st.metric("Ortalama Onarım Güveni", f"{mean_conf:.1%}")
+
 # ── Tab 2: Comparison ──────────────────────────────────────────────────────
 with tab_compare:
     valid_methods = [m for m in results if results[m].get("error") is None]
