@@ -12,7 +12,7 @@ from pipeline.ensemble import hybrid_majority_vote
 from pipeline.filters_classic import apply_classic_filters
 from pipeline.ingestion import load_data, preprocess, validate_schema
 from pipeline.tracer import PipelineTracer
-from pipeline.validator import calculate_metrics, validate_output
+from pipeline.validator import validate_output
 
 logger = logging.getLogger(__name__)
 

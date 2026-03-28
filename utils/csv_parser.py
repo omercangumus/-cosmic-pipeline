@@ -4,7 +4,6 @@ import base64
 import io
 import logging
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -61,7 +60,8 @@ def parse_uploaded_csv(
                     import h5py
                 except ImportError:
                     return None, "HDF5 destegi icin h5py yukleyin: pip install h5py"
-                import tempfile, os
+                import os
+                import tempfile
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".h5")
                 try:
                     tmp.write(decoded)
