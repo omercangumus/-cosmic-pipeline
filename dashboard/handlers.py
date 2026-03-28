@@ -193,8 +193,40 @@ def generate_data(n_samples, seed, seu_count, tid_slope, gap_count, noise_max):
 
         fig = plot_clean_vs_corrupted(clean, corrupted)
 
+        # Enrich corrupted with realistic satellite telemetry columns
+        n = len(corrupted)
+        rng = np.random.default_rng(int(seed))
+        corrupted = corrupted.copy()
+        corrupted["h_dbm"] = rng.uniform(-80, -40, n)
+        corrupted["radiation_dose_rad"] = rng.uniform(0.001, 0.05, n)
+        corrupted["status_flag"] = 0
+        corrupted["data_quality"] = rng.uniform(0.85, 1.0, n)
+        corrupted["telemetry_packet_id"] = range(1, n + 1)
+
+        nan_mask = corrupted["value"].isna()
+        corrupted.loc[nan_mask, "h_dbm"] = np.nan
+        corrupted.loc[nan_mask, "radiation_dose_rad"] = np.nan
+        corrupted.loc[nan_mask, "status_flag"] = 1
+        corrupted.loc[nan_mask, "data_quality"] = np.nan
+
+        if corrupted["value"].notna().any():
+            mean_v = corrupted["value"].mean()
+            std_v = corrupted["value"].std()
+            if std_v > 0:
+                spike_mask = (corrupted["value"] - mean_v).abs() > 3 * std_v
+                n_spikes = spike_mask.sum()
+                if n_spikes > 0:
+                    corrupted.loc[spike_mask, "h_dbm"] = np.where(
+                        rng.random(n_spikes) > 0.5, 999.0, -999.0,
+                    )
+                    corrupted.loc[spike_mask, "radiation_dose_rad"] = rng.uniform(3.0, 15.0, n_spikes)
+                    corrupted.loc[spike_mask, "status_flag"] = 1
+                    corrupted.loc[spike_mask, "data_quality"] = rng.uniform(0.01, 0.08, n_spikes)
+
+        _state["corrupted"] = corrupted
+
         clean_table = clean.head(30)
-        corrupted_table = corrupted[["timestamp", "value"]].head(50)
+        corrupted_table = corrupted.head(50)
 
         orbits = clean["orbit_id"].nunique() if "orbit_id" in clean.columns else "?"
         info = (
