@@ -112,3 +112,42 @@ def test_corrupted_dataset_drops_metadata():
     assert "orbit_id" in clean.columns
     assert "timestamp" in corrupted.columns
     assert "value" in corrupted.columns
+
+
+def test_clean_signal_has_all_telemetry_columns():
+    """All 20 telemetry columns should be present."""
+    df = generate_clean_signal(n=5000, seed=42)
+    expected = [
+        "timestamp", "value", "satellite_id", "sensor_id", "orbit_id",
+        "phase", "latitude", "longitude", "altitude_km",
+        "battery_voltage", "solar_panel_current",
+        "magnetometer_x", "magnetometer_y", "magnetometer_z",
+        "cpu_temperature", "signal_strength_dbm", "radiation_dose_rad",
+        "status_flag", "data_quality", "telemetry_packet_id",
+    ]
+    for col in expected:
+        assert col in df.columns, f"Missing column: {col}"
+
+
+def test_latitude_range():
+    df = generate_clean_signal(n=10000, seed=42)
+    assert df["latitude"].min() >= -90
+    assert df["latitude"].max() <= 90
+
+
+def test_battery_voltage_range():
+    df = generate_clean_signal(n=10000, seed=42)
+    assert df["battery_voltage"].min() > 25
+    assert df["battery_voltage"].max() < 35
+
+
+def test_radiation_dose_monotonic():
+    df = generate_clean_signal(n=5000, seed=42)
+    diffs = df["radiation_dose_rad"].diff().dropna()
+    assert (diffs >= 0).all(), "Radiation dose must be monotonically increasing"
+
+
+def test_telemetry_packet_sequential():
+    df = generate_clean_signal(n=1000, seed=42)
+    assert df["telemetry_packet_id"].iloc[0] == 1
+    assert df["telemetry_packet_id"].iloc[-1] == 1000

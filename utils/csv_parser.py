@@ -18,12 +18,14 @@ def parse_uploaded_csv(
     filename: str = "upload.csv",
 ) -> tuple[pd.DataFrame | None, str | None]:
     """
-    Parse a Dash/Streamlit-style base64-encoded CSV upload into pipeline format.
+    Parse a base64-encoded file upload into pipeline format.
+
+    Supports CSV, TSV, Excel (.xlsx/.xls), and JSON files.
+    Auto-detects delimiter for CSV files.
 
     Args:
-        contents: Base64-encoded CSV string (``"data:text/csv;base64,<payload>"``).
-                  May also be a raw base64 string without the prefix.
-        filename: Original filename (for error messages only).
+        contents: Base64-encoded string (``"data:...;base64,<payload>"``).
+        filename: Original filename (used for format detection).
 
     Returns:
         ``(df, None)`` on success — df has columns ``[timestamp, value]``.
@@ -41,13 +43,35 @@ def parse_uploaded_csv(
 
         decoded = base64.b64decode(content_string)
 
-        # --- Read CSV ---
+        # --- Read file based on extension ---
+        filename_lower = filename.lower()
+
         try:
-            df = pd.read_csv(io.BytesIO(decoded))
+            if filename_lower.endswith((".xlsx", ".xls")):
+                df = pd.read_excel(io.BytesIO(decoded))
+
+            elif filename_lower.endswith(".json"):
+                df = pd.read_json(io.BytesIO(decoded))
+
+            elif filename_lower.endswith(".tsv"):
+                df = pd.read_csv(io.BytesIO(decoded), sep="\t")
+
+            else:
+                # CSV with auto-delimiter detection
+                try:
+                    import csv as _csv_mod
+                    sample = decoded[:2048].decode("utf-8", errors="ignore")
+                    dialect = _csv_mod.Sniffer().sniff(sample)
+                    df = pd.read_csv(io.BytesIO(decoded), sep=dialect.delimiter)
+                except Exception:
+                    df = pd.read_csv(io.BytesIO(decoded))
+
         except pd.errors.EmptyDataError:
             return None, "Dosya boş veya geçersiz CSV formatı"
         except pd.errors.ParserError:
             return None, "CSV parse hatası — dosya formatını kontrol edin"
+        except Exception as e:
+            return None, f"Dosya okuma hatası: {e}"
 
         if df.empty or len(df.columns) == 0:
             return None, "Dosya boş veya sütun bulunamadı"

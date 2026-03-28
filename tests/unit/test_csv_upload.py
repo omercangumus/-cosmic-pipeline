@@ -133,3 +133,29 @@ class TestCSVUploadParsing:
         result, error = parse_uploaded_csv(contents, "unsorted.csv")
         assert error is None
         assert result["timestamp"].is_monotonic_increasing
+
+    def test_tsv_file_parsed(self):
+        """TSV files should be parsed correctly."""
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=20, freq="1s"),
+            "value": range(20),
+        })
+        tsv_string = df.to_csv(index=False, sep="\t")
+        encoded = base64.b64encode(tsv_string.encode()).decode()
+        contents = f"data:text/tab-separated-values;base64,{encoded}"
+        result, error = parse_uploaded_csv(contents, "test.tsv")
+        assert error is None
+        assert len(result) == 20
+
+    def test_json_file_parsed(self):
+        """JSON files should be parsed correctly."""
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=20, freq="1s").astype(str),
+            "value": range(20),
+        })
+        json_string = df.to_json()
+        encoded = base64.b64encode(json_string.encode()).decode()
+        contents = f"data:application/json;base64,{encoded}"
+        result, error = parse_uploaded_csv(contents, "test.json")
+        assert error is None
+        assert len(result) == 20

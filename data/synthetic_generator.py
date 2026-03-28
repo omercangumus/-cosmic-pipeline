@@ -231,7 +231,7 @@ def generate_clean_signal(n: int = 10000, seed: int = 42) -> pd.DataFrame:
 
     value = base_temp + orbital_cycle + thermal_drift + eclipse_cooling + noise
 
-    # Metadata
+    # Orbit metadata
     orbit_id = (t // orbital_period).astype(int)
     phase_labels = np.where(
         orbit_phase < 0.3, "ascending",
@@ -240,17 +240,72 @@ def generate_clean_signal(n: int = 10000, seed: int = 42) -> pd.DataFrame:
                           np.where(orbit_phase < 0.95, "eclipse", "recovery"))),
     )
 
+    # Position (LEO orbit, ISS-like inclination)
+    inclination = 51.6
+    latitude = inclination * np.sin(2 * np.pi * t / orbital_period)
+    longitude = (t * 360 / orbital_period * 0.06) % 360
+    altitude_km = 408.0 + 5.0 * np.sin(2 * np.pi * t / orbital_period * 2)
+
+    # Power system
+    is_sunlit = ~eclipse_mask
+    battery_voltage = np.where(
+        is_sunlit, 31.0 + rng.normal(0, 0.2, n), 28.5 + rng.normal(0, 0.3, n),
+    )
+    solar_panel_current = np.where(
+        is_sunlit, 5.0 + rng.normal(0, 0.1, n), 0.05 + rng.normal(0, 0.01, n),
+    )
+
+    # Magnetometer (orbit-coupled sinusoidal)
+    mag_x = 25000 * np.sin(2 * np.pi * t / orbital_period) + rng.normal(0, 100, n)
+    mag_y = 25000 * np.cos(2 * np.pi * t / orbital_period) + rng.normal(0, 100, n)
+    mag_z = 15000 * np.sin(2 * np.pi * t / (orbital_period * 0.5)) + rng.normal(0, 100, n)
+
+    # CPU temperature (correlated with thermal but independent)
+    cpu_temperature = 40.0 + 3.0 * np.sin(2 * np.pi * t / orbital_period) + rng.normal(0, 0.3, n)
+
+    # Signal strength (altitude-dependent)
+    signal_strength_dbm = -60.0 + 10.0 * np.sin(2 * np.pi * t / orbital_period) + rng.normal(0, 2, n)
+
+    # Cumulative radiation dose (monotonically increasing)
+    radiation_dose_rad = np.cumsum(rng.uniform(0.001, 0.003, n))
+
+    # Status and quality
+    status_flag = np.zeros(n, dtype=int)
+    status_flag[rng.random(n) < 0.01] = 1
+    status_flag[rng.random(n) < 0.002] = 2
+
+    data_quality = np.ones(n) * 0.98 + rng.normal(0, 0.01, n)
+    data_quality[eclipse_mask] -= 0.05
+    data_quality = np.clip(data_quality, 0.0, 1.0)
+
+    telemetry_packet_id = np.arange(1, n + 1)
+
     logger.info(
-        "Generated realistic thermal telemetry: %d samples, %d orbits",
+        "Generated realistic satellite telemetry: %d samples, %d orbits, 20 columns",
         n, int(orbit_id[-1]) + 1,
     )
 
     return pd.DataFrame({
         "timestamp": timestamps,
         "value": value,
+        "satellite_id": "TURKSAT-6A",
+        "sensor_id": "THERM-001",
         "orbit_id": orbit_id,
         "phase": phase_labels,
-        "sensor_id": "THERM-001",
+        "latitude": latitude,
+        "longitude": longitude,
+        "altitude_km": altitude_km,
+        "battery_voltage": battery_voltage,
+        "solar_panel_current": solar_panel_current,
+        "magnetometer_x": mag_x,
+        "magnetometer_y": mag_y,
+        "magnetometer_z": mag_z,
+        "cpu_temperature": cpu_temperature,
+        "signal_strength_dbm": signal_strength_dbm,
+        "radiation_dose_rad": radiation_dose_rad,
+        "status_flag": status_flag,
+        "data_quality": data_quality,
+        "telemetry_packet_id": telemetry_packet_id,
     })
 
 

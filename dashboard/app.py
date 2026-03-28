@@ -278,11 +278,7 @@ def generate_data(n_samples, seed, seu_count, tid_slope, gap_count, noise_max):
 
         fig = _plot_clean_vs_corrupted(clean, corrupted)
 
-        display_cols = ["timestamp", "value"]
-        for c in ("orbit_id", "phase", "sensor_id"):
-            if c in clean.columns:
-                display_cols.append(c)
-        clean_table = clean[display_cols].head(50)
+        clean_table = clean.head(30)
         corrupted_table = corrupted[["timestamp", "value"]].head(50)
 
         orbits = clean["orbit_id"].nunique() if "orbit_id" in clean.columns else "?"
@@ -433,7 +429,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
                     gr.Markdown("---")
                     gr.Markdown("### CSV Yukle")
-                    csv_file = gr.File(label="CSV Dosyasi", file_types=[".csv"])
+                    csv_file = gr.File(label="CSV/TSV/Excel/JSON", file_types=[".csv", ".tsv", ".xlsx", ".xls", ".json"])
                     btn_csv = gr.Button("📁 CSV Yukle")
 
                     txt_status = gr.Textbox(label="Durum", interactive=False)
