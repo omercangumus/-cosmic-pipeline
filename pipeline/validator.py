@@ -382,3 +382,108 @@ def verify_repair(
         "variance_ratio": round(variance_ratio, 4),
         "out_of_range_repairs": out_of_range,
     }
+
+
+def validate_sampling_rate(
+    df: pd.DataFrame,
+    expected_interval_seconds: float | None = None,
+    max_jitter_ratio: float = 0.5,
+) -> dict:
+    """
+    Check timestamp sampling-rate consistency.
+
+    Detects jitter, large gaps, and unexpected compression in the
+    time axis of the signal.
+
+    Args:
+        df: DataFrame with a 'timestamp' column.
+        expected_interval_seconds: Expected interval. Estimated from
+            the median if *None*.
+        max_jitter_ratio: Acceptable std/median ratio.
+
+    Returns:
+        Dict with keys: valid, issues, detected_interval,
+        expected_interval, jitter_ratio, n_irregular, irregular_ratio,
+        n_large_gaps, n_compressed.
+    """
+    issues: list[str] = []
+    result: dict = {
+        "valid": True,
+        "issues": issues,
+        "detected_interval": 0.0,
+        "expected_interval": 0.0,
+        "jitter_ratio": 0.0,
+        "n_irregular": 0,
+        "irregular_ratio": 0.0,
+        "n_large_gaps": 0,
+        "n_compressed": 0,
+    }
+
+    if "timestamp" not in df.columns:
+        issues.append("No timestamp column found")
+        result["valid"] = False
+        return result
+
+    if not pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+        issues.append("Timestamp column is not datetime type")
+        result["valid"] = False
+        return result
+
+    if len(df) < 3:
+        issues.append("Too few data points for sampling rate analysis")
+        result["valid"] = False
+        return result
+
+    intervals = df["timestamp"].diff().dt.total_seconds().dropna().values
+
+    if len(intervals) == 0:
+        issues.append("Could not compute intervals")
+        result["valid"] = False
+        return result
+
+    median_interval = float(np.median(intervals))
+    if expected_interval_seconds is None:
+        expected_interval_seconds = median_interval
+
+    result["detected_interval"] = round(median_interval, 4)
+    result["expected_interval"] = round(expected_interval_seconds, 4)
+
+    # Jitter
+    jitter = float(np.std(intervals)) / median_interval if median_interval > 0 else 0.0
+    result["jitter_ratio"] = round(jitter, 4)
+    if jitter > max_jitter_ratio:
+        issues.append(f"High jitter: {jitter:.2%} (threshold: {max_jitter_ratio:.0%})")
+
+    # Irregular intervals (>150% of median deviation)
+    tolerance = median_interval * 1.5
+    irregular = np.abs(intervals - median_interval) > tolerance
+    n_irregular = int(irregular.sum())
+    result["n_irregular"] = n_irregular
+    result["irregular_ratio"] = round(n_irregular / len(intervals), 4) if len(intervals) > 0 else 0.0
+    if result["irregular_ratio"] > 0.1:
+        issues.append(f"{n_irregular} irregular intervals ({result['irregular_ratio']:.1%})")
+
+    # Large gaps (>10x median)
+    large_gap_threshold = median_interval * 10
+    n_large_gaps = int((intervals > large_gap_threshold).sum())
+    result["n_large_gaps"] = n_large_gaps
+    if n_large_gaps > 0:
+        issues.append(f"{n_large_gaps} large gaps (>{large_gap_threshold:.1f}s)")
+
+    # Compressed intervals (<20% of median)
+    if median_interval > 0:
+        n_compressed = int((intervals < median_interval * 0.2).sum())
+    else:
+        n_compressed = 0
+    result["n_compressed"] = n_compressed
+    if n_compressed > 0:
+        issues.append(f"{n_compressed} compressed intervals (unexpectedly frequent)")
+
+    result["valid"] = len(issues) == 0
+
+    logger.info(
+        "Sampling rate: interval=%.2fs, jitter=%.2f%%, irregular=%d, gaps=%d, compressed=%d — %s",
+        median_interval, jitter * 100, n_irregular, n_large_gaps, n_compressed,
+        "VALID" if result["valid"] else "ISSUES FOUND",
+    )
+    return result

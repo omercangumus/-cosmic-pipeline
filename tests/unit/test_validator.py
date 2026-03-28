@@ -277,3 +277,64 @@ class TestEndToEndConfidence:
         conf = result["repair_confidence"]
         assert (conf >= 0.0).all()
         assert (conf <= 1.0).all()
+
+
+# --- validate_sampling_rate ---
+
+from pipeline.validator import validate_sampling_rate
+
+
+class TestSamplingRate:
+
+    def test_uniform_sampling_valid(self):
+        n = 200
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=n, freq="1s"),
+            "value": np.ones(n),
+        })
+        result = validate_sampling_rate(df)
+        assert result["valid"]
+        assert result["detected_interval"] == pytest.approx(1.0, abs=0.1)
+        assert result["jitter_ratio"] < 0.01
+        assert result["n_large_gaps"] == 0
+
+    def test_irregular_sampling_detected(self):
+        timestamps = pd.date_range("2024-01-01", periods=100, freq="1s").tolist()
+        for i in range(50, 100):
+            timestamps[i] = timestamps[i] + pd.Timedelta(seconds=60)
+        df = pd.DataFrame({"timestamp": timestamps, "value": np.ones(100)})
+        result = validate_sampling_rate(df)
+        assert result["n_large_gaps"] >= 1
+
+    def test_high_jitter_detected(self):
+        import random
+        random.seed(42)
+        base = pd.Timestamp("2024-01-01")
+        timestamps = [base + pd.Timedelta(seconds=i + random.uniform(-2, 2)) for i in range(200)]
+        timestamps.sort()
+        df = pd.DataFrame({"timestamp": timestamps, "value": np.ones(200)})
+        result = validate_sampling_rate(df)
+        assert result["jitter_ratio"] > 0.1
+
+    def test_no_timestamp_column(self):
+        df = pd.DataFrame({"value": np.ones(50)})
+        result = validate_sampling_rate(df)
+        assert not result["valid"]
+
+    def test_too_few_points(self):
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2024-01-01", periods=2, freq="1s"),
+            "value": [1, 2],
+        })
+        result = validate_sampling_rate(df)
+        assert not result["valid"]
+
+    def test_pipeline_returns_sampling_info(self):
+        from data.synthetic_generator import generate_corrupted_dataset
+        from pipeline.orchestrator import run_pipeline
+
+        _, corrupted, _ = generate_corrupted_dataset(n=2000, seed=42)
+        result = run_pipeline(corrupted, method="classic")
+        assert "sampling_info" in result
+        assert "valid" in result["sampling_info"]
+        assert "detected_interval" in result["sampling_info"]

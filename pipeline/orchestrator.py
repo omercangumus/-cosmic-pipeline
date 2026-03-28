@@ -65,6 +65,12 @@ def run_pipeline(
     validate_schema(data)
     data = preprocess(data)
 
+    # Sampling rate validation
+    from pipeline.validator import validate_sampling_rate
+    sampling_info = validate_sampling_rate(data)
+    if sampling_info["issues"]:
+        logger.warning("Sampling rate issues: %s", ", ".join(sampling_info["issues"]))
+
     # --- 2. Detrend for detection (does NOT modify `data`) ---
     from pipeline.filters_classic import detrend_signal
 
@@ -187,6 +193,7 @@ def run_pipeline(
         "fault_timeline": fault_timeline,
         "repair_confidence": repair_confidence,
         "repair_verification": repair_verification,
+        "sampling_info": sampling_info,
     }
 
 
