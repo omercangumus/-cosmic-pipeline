@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>DataCraft — Kozmik Gorevler v2</title>
+<title>DataCraft v3 — Kozmik Gorevler</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0e17;overflow:hidden;font-family:'Courier New',monospace;color:#fff}
@@ -10,103 +10,259 @@ canvas{display:block}
 #ui{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
 #ui>*{pointer-events:auto}
 
-#hud{position:absolute;top:10px;left:10px;background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:8px;padding:12px;min-width:260px;font-size:12px;line-height:1.6}
-#hud .t{color:#00d4ff;font-size:14px;font-weight:bold;margin-bottom:6px}
+/* HUD top-left */
+#hud{position:absolute;top:10px;left:10px;background:rgba(0,20,40,.88);border:1px solid #00d4ff;border-radius:8px;padding:10px 14px;min-width:220px;font-size:11px;line-height:1.7}
+#hud .t{color:#00d4ff;font-size:13px;font-weight:bold;margin-bottom:4px}
 #hud .s{color:#8bb8d4}
 #hud .v{color:#00ff88;float:right}
 
-#guide{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.9);border:1px solid #f59e0b;border-radius:8px;padding:10px 24px;font-size:13px;color:#f59e0b;text-align:center;opacity:0;transition:opacity .5s;max-width:500px;display:none}
+/* Fullscreen button */
+#fs-btn{position:absolute;top:10px;right:270px;background:rgba(0,20,40,.88);border:1px solid #00d4ff;border-radius:6px;padding:6px 14px;font-size:12px;color:#00d4ff;cursor:pointer;font-family:inherit}
+#fs-btn:hover{background:rgba(0,60,100,.6)}
+
+/* Task panel right */
+#task-panel{position:absolute;top:10px;right:10px;width:250px;background:rgba(0,18,35,.92);border:1px solid #00d4ff;border-radius:8px;padding:10px;font-size:10px;line-height:1.5;max-height:calc(100% - 80px);overflow-y:auto}
+#task-panel .th{color:#00d4ff;font-size:10px;font-weight:bold;letter-spacing:1px;margin:6px 0 3px}
+#task-panel hr{border:none;border-top:1px solid #1a3a4a;margin:6px 0}
+#task-name{color:#fff;font-size:13px;font-weight:bold}
+#task-desc{color:#8bb8d4;font-size:10px}
+.step{color:#555;font-size:10px;margin:2px 0;padding:2px 4px;border-radius:3px}
+.step.done{color:#00ff88;background:rgba(0,255,136,.05)}
+.step.active{color:#f59e0b;background:rgba(245,158,11,.08)}
+.step.locked{color:#444}
+#task-zone{color:#f59e0b;font-size:11px}
+#task-distance{color:#8bb8d4;font-size:10px}
+#task-pipeline{color:#00ff88;font-size:9px;line-height:1.6}
+.det-bar{height:8px;border-radius:3px;margin:2px 0;display:flex;align-items:center}
+.det-bar-fill{height:100%;border-radius:3px;min-width:2px}
+.det-bar-label{color:#8bb8d4;font-size:8px;margin-left:4px;white-space:nowrap}
+
+/* Direction arrow bottom center */
+#compass{position:absolute;bottom:70px;left:50%;transform:translateX(-50%);text-align:center;font-size:12px}
+#compass-arrow{font-size:28px;color:#f59e0b;display:inline-block;transition:transform .15s}
+#compass-dist{color:#8bb8d4;font-size:11px}
+#compass-action{color:#00ff88;font-size:13px;font-weight:bold;display:none;animation:pu 1s infinite}
+
+/* Guide top center */
+#guide{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.92);border:1px solid #f59e0b;border-radius:8px;padding:8px 20px;font-size:12px;color:#f59e0b;text-align:center;max-width:460px;opacity:0;transition:opacity .5s;display:none}
 #guide.show{display:block;opacity:1}
 
-#interact-hint{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.9);border:1px solid #00ff88;border-radius:6px;padding:6px 16px;font-size:12px;color:#00ff88;display:none}
+/* Interact hint */
+#interact-hint{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.9);border:1px solid #00ff88;border-radius:6px;padding:5px 14px;font-size:11px;color:#00ff88;display:none}
 
-#mission-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,15,30,.95);border:2px solid #00d4ff;border-radius:12px;padding:24px;text-align:center;max-width:500px;width:90%;box-shadow:0 0 40px rgba(0,212,255,.2);display:none}
-#mission-panel h2{color:#00d4ff;margin-bottom:10px;font-size:20px}
-#mission-panel .desc{color:#8bb8d4;margin-bottom:8px;font-size:13px}
-#mission-panel .pi{background:rgba(0,50,80,.5);border-radius:6px;padding:10px;margin:10px 0;text-align:left;font-size:11px;color:#00ff88}
-#mission-panel .obj{color:#f59e0b;font-size:14px;margin:10px 0;font-weight:bold}
-#mission-panel button{background:linear-gradient(135deg,#00d4ff,#0088aa);border:none;color:#fff;padding:10px 30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit;margin-top:8px;transition:transform .2s}
-#mission-panel button:hover{transform:scale(1.05)}
+/* Mission briefing panel */
+#mission-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,12,25,.96);border:2px solid #00d4ff;border-radius:12px;padding:0;text-align:center;max-width:520px;width:92%;box-shadow:0 0 50px rgba(0,212,255,.15);display:none;overflow:hidden}
+#mp-head{background:rgba(0,40,70,.5);padding:16px;border-bottom:1px solid #1a3a5a}
+#mp-head h2{color:#00d4ff;font-size:18px;margin-bottom:4px}
+#mp-head .desc{color:#8bb8d4;font-size:11px}
+#mp-body{padding:16px}
+#mp-body .obj{color:#f59e0b;font-size:13px;margin:10px 0;font-weight:bold}
+#mp-body button{background:linear-gradient(135deg,#00d4ff,#0088aa);border:none;color:#fff;padding:10px 30px;border-radius:6px;cursor:pointer;font-size:14px;font-family:inherit;margin-top:6px;transition:transform .2s}
+#mp-body button:hover{transform:scale(1.05)}
 
-#pipeline-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,10,20,.95);border:2px solid #f59e0b;border-radius:12px;padding:20px;text-align:center;min-width:350px;display:none}
-#pipeline-overlay h3{color:#f59e0b;margin-bottom:10px}
-.ps{color:#555;font-size:12px;margin:4px 0;transition:color .3s}
+/* Pipeline result panel (inside mission panel) */
+#pr-panel{background:rgba(0,30,50,.6);border-radius:8px;padding:12px;margin:10px 0;text-align:left;font-size:10px}
+#pr-panel .pr-title{color:#00d4ff;font-size:11px;font-weight:bold;margin-bottom:6px}
+#pr-panel .pr-row{display:flex;justify-content:space-between;color:#8bb8d4;margin:2px 0}
+#pr-panel .pr-val{color:#00ff88}
+.layer-bar{display:flex;align-items:center;margin:3px 0;font-size:9px}
+.layer-bar-bg{width:120px;height:10px;background:#1a2a3a;border-radius:4px;margin:0 6px;overflow:hidden}
+.layer-bar-fg{height:100%;border-radius:4px}
+.layer-label{color:#8bb8d4;min-width:55px}
+.layer-val{color:#aaa;min-width:30px}
+
+/* Pipeline overlay (animated steps) */
+#pipeline-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,10,20,.96);border:2px solid #f59e0b;border-radius:12px;padding:20px 28px;text-align:center;min-width:340px;display:none}
+#pipeline-overlay h3{color:#f59e0b;margin-bottom:10px;font-size:15px}
+.ps{color:#444;font-size:11px;margin:4px 0;transition:color .3s}
 .ps.a{color:#f59e0b}
 .ps.d{color:#00ff88}
 
-#stage-complete{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,15,30,.95);border:2px solid #00ff88;border-radius:12px;padding:30px;text-align:center;max-width:450px;display:none;box-shadow:0 0 60px rgba(0,255,136,.3)}
-#stage-complete h1{color:#00ff88;font-size:28px}
-#stage-complete button{background:linear-gradient(135deg,#00ff88,#00aa55);border:none;color:#0a0e17;padding:12px 40px;border-radius:6px;cursor:pointer;font-size:16px;font-weight:bold;font-family:inherit;margin-top:15px}
+/* Stage complete */
+#stage-complete{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,15,30,.96);border:2px solid #00ff88;border-radius:12px;padding:28px;text-align:center;max-width:440px;display:none;box-shadow:0 0 60px rgba(0,255,136,.2)}
+#stage-complete h1{color:#00ff88;font-size:26px}
+#stage-complete button{background:linear-gradient(135deg,#00ff88,#00aa55);border:none;color:#0a0e17;padding:12px 36px;border-radius:6px;cursor:pointer;font-size:15px;font-weight:bold;font-family:inherit;margin-top:14px}
 
-#progress-bar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:20px;padding:6px 16px;font-size:11px;display:flex;gap:8px;align-items:center}
-.pd{width:14px;height:14px;border-radius:50%;border:2px solid #335;display:inline-block}
+/* Progress bar */
+#progress-bar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(0,20,40,.88);border:1px solid #00d4ff;border-radius:20px;padding:5px 14px;font-size:10px;display:flex;gap:6px;align-items:center}
+.pd{width:12px;height:12px;border-radius:50%;border:2px solid #335;display:inline-block}
 .pd.dn{background:#00ff88;border-color:#00ff88}
 .pd.ac{background:#f59e0b;border-color:#f59e0b;animation:pu 1s infinite}
-.pd.lk{background:#222;border-color:#335}
-@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
+.pd.lk{background:#1a1a2a;border-color:#335}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.4}}
 
-#controls-hint{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);color:#445;font-size:11px;text-align:center}
-#minimap{position:absolute;bottom:50px;right:10px;width:140px;height:140px;background:rgba(0,20,40,.85);border:1px solid #00d4ff;border-radius:8px;overflow:hidden}
-#minimap canvas{width:100%;height:100%}
+/* Minimap */
+#minimap{position:absolute;bottom:55px;right:10px;width:140px;height:140px;background:rgba(0,15,30,.9);border:1px solid #00d4ff;border-radius:8px;overflow:hidden}
+#minimap-canvas{width:140px;height:140px}
+
+/* Controls hint */
+#controls-hint{position:absolute;bottom:32px;left:10px;color:#334;font-size:9px}
 </style>
 </head>
 <body>
 <div id="ui">
+
+<!-- HUD -->
 <div id="hud">
-<div class="t">&#x1F6F0;&#xFE0F; COSMIC PIPELINE — DataCraft v2</div>
+<div class="t">&#x1F6F0;&#xFE0F; DataCraft v3</div>
 <div><span class="s">Asama:</span><span class="v" id="h-stg">1 / 2</span></div>
 <div><span class="s">Gorev:</span><span class="v" id="h-mis">—</span></div>
 <div><span class="s">Hedef:</span><span class="v" id="h-prg">—</span></div>
-<div><span class="s">Sure:</span><span class="v" id="h-time">0s</span></div>
+<div><span class="s">Sure:</span><span class="v" id="h-time">—</span></div>
 <div><span class="s">Puan:</span><span class="v" id="h-score">0</span></div>
 </div>
+
+<!-- Fullscreen -->
+<button id="fs-btn" onclick="toggleFS()">&#x26F6; Tam Ekran</button>
+
+<!-- Task Panel -->
+<div id="task-panel">
+<div class="th">AKTIF GOREV</div>
+<div id="task-name">—</div>
+<div id="task-desc">Gorev bekleniyor...</div>
+<hr>
+<div class="th">ADIMLAR</div>
+<div id="task-steps">
+<div class="step locked">Pipeline bekleniyor</div>
+</div>
+<hr>
+<div class="th">HEDEF BOLGE</div>
+<div id="task-zone">—</div>
+<div id="task-distance">—</div>
+<hr>
+<div class="th">PIPELINE SONUCU</div>
+<div id="task-pipeline">Henuz calistirilmadi</div>
+</div>
+
+<!-- Compass -->
+<div id="compass">
+<div id="compass-arrow">&#x2B06;</div>
+<div id="compass-dist"></div>
+<div id="compass-action">SPACE bas!</div>
+</div>
+
+<!-- Guide -->
 <div id="guide"></div>
 <div id="interact-hint">SPACE ile etkilesim</div>
-<div id="mission-panel"><h2 id="mp-t"></h2><div class="desc" id="mp-d"></div><div class="pi" id="mp-p"></div><div class="obj" id="mp-o"></div><button id="mp-btn">GOREVE BASLA</button></div>
-<div id="pipeline-overlay"><h3>Pipeline Calisiyor...</h3><div class="ps" id="ps1">1. Veri Alimi</div><div class="ps" id="ps2">2. Trend Kaldirma</div><div class="ps" id="ps3">3. Anomali Tespiti</div><div class="ps" id="ps4">4. Ensemble Oylama</div><div class="ps" id="ps5">5. Filtreleme</div><div class="ps" id="ps6">6. Dogrulama</div><div style="margin-top:12px;color:#8bb8d4;font-size:11px" id="ps-st">Isleniyor...</div></div>
+
+<!-- Mission Panel -->
+<div id="mission-panel">
+<div id="mp-head"><h2 id="mp-t"></h2><div class="desc" id="mp-d"></div></div>
+<div id="mp-body">
+<div id="pr-panel">
+<div class="pr-title">PIPELINE SONUCU</div>
+<div id="pr-data"></div>
+<div id="pr-layers"></div>
+<div id="pr-summary"></div>
+</div>
+<div class="obj" id="mp-o"></div>
+<button id="mp-btn">GOREVE BASLA</button>
+</div>
+</div>
+
+<!-- Pipeline Overlay -->
+<div id="pipeline-overlay">
+<h3>Pipeline Calisiyor...</h3>
+<div class="ps" id="ps1">1. Veri Alimi</div>
+<div class="ps" id="ps2">2. Trend Kaldirma</div>
+<div class="ps" id="ps3">3. Anomali Tespiti (9 Detektor)</div>
+<div class="ps" id="ps4">4. Ensemble Oylama</div>
+<div class="ps" id="ps5">5. Filtreleme (Mercek Modeli)</div>
+<div class="ps" id="ps6">6. Dogrulama</div>
+<div style="margin-top:10px;color:#8bb8d4;font-size:10px" id="ps-st">Isleniyor...</div>
+</div>
+
+<!-- Stage Complete -->
 <div id="stage-complete"><h1 id="sc-t"></h1><p id="sc-d" style="color:#8bb8d4;margin:10px 0"></p><p style="color:#00ff88;font-size:18px" id="sc-s"></p><button id="sc-b"></button></div>
+
+<!-- Progress -->
 <div id="progress-bar">
-<span style="color:#00d4ff;font-size:10px" id="pb-l">ASAMA 1</span>
+<span style="color:#00d4ff;font-size:9px" id="pb-l">ASAMA 1</span>
 <span class="pd ac" id="pd0"></span><span class="pd lk" id="pd1"></span><span class="pd lk" id="pd2"></span><span class="pd lk" id="pd3"></span>
-<span style="color:#335">|</span><span style="color:#335;font-size:10px">ASAMA 2</span>
+<span style="color:#335">|</span><span style="color:#335;font-size:9px">A2</span>
 <span class="pd lk" id="pd4"></span><span class="pd lk" id="pd5"></span><span class="pd lk" id="pd6"></span><span class="pd lk" id="pd7"></span>
 </div>
-<div id="controls-hint">WASD: Hareket | SPACE: Etkilesim | Fare: Bakis | Tiklayarak basla</div>
+
+<!-- Minimap -->
+<div id="minimap"><canvas id="minimap-canvas" width="140" height="140"></canvas></div>
+
+<div id="controls-hint">WASD Hareket | SHIFT Kos | SPACE Etkilesim | Fare Bakis</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-/* ═══════════════════════════════════════════════════════
-   MISSIONS
-   ═══════════════════════════════════════════════════════ */
+/* =============================================================
+   FULLSCREEN
+   ============================================================= */
+function toggleFS(){
+  if(!document.fullscreenElement)document.documentElement.requestFullscreen().catch(function(){});
+  else document.exitFullscreen();
+}
+
+/* =============================================================
+   MISSIONS — 2 stages, 8 missions, 3-phase each
+   ============================================================= */
+var ZONE_C={center:{x:0,z:0},weather:{x:-13,z:-13},farm:{x:13,z:13},disaster:{x:-13,z:13},comms:{x:13,z:-13}};
+var ZONE_N={center:'Merkez Kontrol Istasyonu',weather:'Hava Durumu Izleme',farm:'Tarim Izleme Alani',disaster:'Afet Izleme Bolgesi',comms:'Uydu Haberlesme Alani'};
+
 var MISSIONS={stage1:[
-{id:'solar_storm',name:'Gunes Firtinasi Kalkani',zone:'center',desc:'Gunes firtinasi yaklsiyor! Anten etrafina kalkan bloklari yerlestir!',objective:'6 kalkan blogunu topla ve antene yerlestir!',targetCount:6,color:0x3b82f6,reward:100},
-{id:'sensor_repair',name:'Hava Sensoru Tamiri',zone:'weather',desc:'Radyasyon 5 hava sensorunu bozdu! Sari sensörleri tamir et!',objective:'5 bozuk sensoru tamir et (yaklas + SPACE)!',targetCount:5,color:0xf59e0b,reward:120},
-{id:'irrigation',name:'Tarla Sulama Restorasyonu',zone:'farm',desc:'Uydu verisi sulama hattinin arizalandigini gosteriyor!',objective:'4 vana blogunu ac!',targetCount:4,color:0x22c55e,reward:150},
-{id:'comms_repair',name:'Acil Iletisim Onarimi',zone:'comms',desc:'Uydu-yer baglantisi koptu! Anten modullerini onar!',objective:'5 anten modulunu onar (yaklas + SPACE)!',targetCount:5,color:0x06b6d4,reward:130}
+{id:'solar_storm',name:'Gunes Firtinasi Kalkani',zone:'center',returnZone:'center',
+ desc:'Gunes firtinasi yaklsiyor! Anten etrafina kalkan bloklari yerlestir!',
+ collectText:'Mavi kalkan bloklarini topla!',returnText:'Antene don ve kalkanlari yerlestir!',
+ doneText:'Kalkan aktif! Uydu korunuyor!',
+ targetCount:6,color:0x3b82f6,reward:100},
+{id:'sensor_repair',name:'Hava Sensoru Tamiri',zone:'weather',returnZone:'weather',
+ desc:'Radyasyon 5 hava sensorunu bozdu!',
+ collectText:'Sari sensorleri tamir et (yaklas + SPACE)!',returnText:'Kontrol paneline don ve kalibrasyonu onayla!',
+ doneText:'Sensorler kalibre edildi! Veri akisi basliyor!',
+ targetCount:5,color:0xf59e0b,reward:120},
+{id:'irrigation',name:'Tarla Sulama Restorasyonu',zone:'farm',returnZone:'farm',
+ desc:'Uydu verisi sulama hattinin arizalandigini gosteriyor!',
+ collectText:'Yesil vana bloklarini bul ve ac!',returnText:'Sulama merkezine don ve sistemi aktifle!',
+ doneText:'Sulama aktif! Tarlalar sulaniyor!',
+ targetCount:4,color:0x22c55e,reward:150},
+{id:'comms_repair',name:'Acil Iletisim Onarimi',zone:'comms',returnZone:'comms',
+ desc:'Uydu-yer baglantisi koptu!',
+ collectText:'Cyan anten modullerini onar!',returnText:'Iletisim kulesine don ve baglatiyi test et!',
+ doneText:'Baglanti kuruldu! Veri aktarimi basliyor!',
+ targetCount:5,color:0x06b6d4,reward:130}
 ],stage2:[
-{id:'debris',name:'Uzay Enkaz Temizligi',zone:'all',desc:'Yorungede 8 enkaz parcasi uyduyu tehdit ediyor!',objective:'8 enkaz parcasini temizle!',targetCount:8,color:0xef4444,reward:200},
-{id:'drought',name:'Kuraklik Mudahalesi',zone:'farm',desc:'Uydu termal goruntusu kuraklik tespit etti!',objective:'6 su deposunu aktifle!',targetCount:6,color:0x0088ff,reward:180},
-{id:'fire',name:'Yangin Sondurme',zone:'disaster',desc:'Uydu yangin noktalarini belirledi!',objective:'7 yangin sondurme unitesini aktifle!',targetCount:7,color:0xffffff,reward:220},
-{id:'calibration',name:'Manyetik Firtina Kalibrasyonu',zone:'all',desc:'Manyetik firtina tum sistemleri etkiledi!',objective:'5 kalibrasyon noktasini ziyaret et!',targetCount:5,color:0x8b5cf6,reward:250}
+{id:'debris',name:'Uzay Enkaz Temizligi',zone:'all',returnZone:'center',
+ desc:'Yorungede enkaz parcalari uyduyu tehdit ediyor!',
+ collectText:'Kirmizi enkaz parcalarini temizle!',returnText:'Merkeze don ve raporu ilet!',
+ doneText:'Enkaz temizlendi! Yorunge guvenli!',
+ targetCount:8,color:0xef4444,reward:200},
+{id:'drought',name:'Kuraklik Mudahalesi',zone:'farm',returnZone:'farm',
+ desc:'Uydu termal goruntusu kuraklik tespit etti!',
+ collectText:'Mavi su depolarini aktifle!',returnText:'Drone pad\'e don ve sulama dronunu kaldir!',
+ doneText:'Su dagitimi basladi! Kuraklik onleniyor!',
+ targetCount:6,color:0x0088ff,reward:180},
+{id:'fire',name:'Yangin Sondurme',zone:'disaster',returnZone:'disaster',
+ desc:'Uydu yangin noktalarini belirledi!',
+ collectText:'Beyaz sondurme unitelerini aktifle!',returnText:'Helikopter pistine don ve havadan sondurme basalt!',
+ doneText:'Yanginlar kontrol altinda!',
+ targetCount:7,color:0xffffff,reward:220},
+{id:'calibration',name:'Manyetik Firtina Kalibrasyonu',zone:'all',returnZone:'center',
+ desc:'Manyetik firtina tum sistemleri etkiledi!',
+ collectText:'Mor kalibrasyon noktalarini ziyaret et!',returnText:'Merkeze don ve kalibrasyon raporunu onayla!',
+ doneText:'Sistemler kalibre edildi!',
+ targetCount:5,color:0x8b5cf6,reward:250}
 ]};
 
-var ZONE_CENTERS={center:{x:0,z:0},weather:{x:-12,z:-12},farm:{x:12,z:12},disaster:{x:-12,z:12},comms:{x:12,z:-12}};
-var ZONE_NAMES={center:'Merkez Kontrol Istasyonu',weather:'Hava Durumu Izleme Alani',farm:'Tarim Izleme Alani',disaster:'Afet Izleme Bolgesi',comms:'Uydu Haberlesme Alani'};
-
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
    STATE
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 var stg=1,mIdx=0,score=0,mActive=false,targets=[],collected=0,tCount=0;
-var pResult=null,phase='idle',mTimer=0,mStartTime=0;
-var nearTarget=false;
+var pResult=null,phase='idle',mStartTime=0;
+var nearTarget=false,returnPoint=null,missionPhase='none'; // none,collect,return
+var shiftDown=false;
 
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
    THREE SETUP
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 var sc=new THREE.Scene();
 sc.background=new THREE.Color(0x0a0e17);
-sc.fog=new THREE.FogExp2(0x0a0e17,0.012);
+sc.fog=new THREE.FogExp2(0x0a0e17,0.01);
 
 var cam=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,0.1,300);
 var ren=new THREE.WebGLRenderer({antialias:true});
@@ -116,358 +272,481 @@ ren.shadowMap.enabled=true;
 ren.shadowMap.type=THREE.PCFSoftShadowMap;
 document.body.appendChild(ren.domElement);
 
-sc.add(new THREE.AmbientLight(0x445566,0.7));
+sc.add(new THREE.AmbientLight(0x556677,0.7));
 var sunL=new THREE.DirectionalLight(0xffeedd,1.0);
 sunL.position.set(30,40,20);sunL.castShadow=true;
 sunL.shadow.mapSize.set(1024,1024);
-sunL.shadow.camera.left=-30;sunL.shadow.camera.right=30;
-sunL.shadow.camera.top=30;sunL.shadow.camera.bottom=-30;
+sunL.shadow.camera.left=-35;sunL.shadow.camera.right=35;
+sunL.shadow.camera.top=35;sunL.shadow.camera.bottom=-35;
 sc.add(sunL);
 
-/* ═══════════════════════════════════════════════════════
-   STARFIELD
-   ═══════════════════════════════════════════════════════ */
-var sG=new THREE.BufferGeometry(),sP=new Float32Array(600*3);
-for(var i=0;i<1800;i++)sP[i]=(Math.random()-.5)*200;
+// Stars
+var sG=new THREE.BufferGeometry(),sP=new Float32Array(800*3);
+for(var i=0;i<2400;i++)sP[i]=(Math.random()-.5)*220;
 sG.setAttribute('position',new THREE.BufferAttribute(sP,3));
-sc.add(new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.15,transparent:true,opacity:0.6})));
+var starMesh=new THREE.Points(sG,new THREE.PointsMaterial({color:0xffffff,size:0.15,transparent:true,opacity:0.6}));
+sc.add(starMesh);
 
-/* ═══════════════════════════════════════════════════════
-   HELPER: BOX
-   ═══════════════════════════════════════════════════════ */
-var _bx=new THREE.BoxGeometry(1,1,1);
+/* =============================================================
+   HELPERS
+   ============================================================= */
 function box(sx,sy,sz,col,em,op){
-  var g=new THREE.BoxGeometry(sx,sy,sz);
-  var m=new THREE.MeshPhongMaterial({color:col,emissive:em||0x000000,transparent:op!==undefined,opacity:op||1});
-  var mesh=new THREE.Mesh(g,m);
-  mesh.castShadow=true;mesh.receiveShadow=true;
-  return mesh;
+  var m=new THREE.MeshPhongMaterial({color:col,emissive:em||0,transparent:op!=null,opacity:op!=null?op:1});
+  var mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m);
+  mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
 }
+function addM(m){sc.add(m);mapO.push(m);return m;}
 
-/* ═══════════════════════════════════════════════════════
+var mapO=[],particles=[];
+
+/* =============================================================
    ROBLOX CHARACTER
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 var player=new THREE.Group();
-var pBody=box(.9,1.3,.5,0xeeeeff,0x111122);
-pBody.position.y=1.4;player.add(pBody);
+var pBody=box(.9,1.3,.5,0xeeeeff,0x111122);pBody.position.y=1.4;player.add(pBody);
+var pHead=box(.55,.55,.55,0xffcc99,0x221100);pHead.position.y=2.3;player.add(pHead);
+var pHelmet=box(.65,.32,.65,0x00d4ff,0x003355,0.55);pHelmet.position.y=2.52;player.add(pHelmet);
+var pVisor=box(.57,.18,.08,0x00ffff,0x006666,0.45);pVisor.position.set(0,2.38,.26);player.add(pVisor);
 
-var pHead=box(.6,.6,.6,0xffcc99,0x221100);
-pHead.position.y=2.35;player.add(pHead);
+var pArmL=box(.26,.85,.26,0xeeeeff,0x111122);pArmL.position.set(-.61,1.5,0);pArmL.geometry.translate(0,-.42,0);player.add(pArmL);
+var pArmR=box(.26,.85,.26,0xeeeeff,0x111122);pArmR.position.set(.61,1.5,0);pArmR.geometry.translate(0,-.42,0);player.add(pArmR);
+var pLegL=box(.26,.85,.26,0x3a3a44,0x111111);pLegL.position.set(-.2,.45,0);pLegL.geometry.translate(0,-.42,0);player.add(pLegL);
+var pLegR=box(.26,.85,.26,0x3a3a44,0x111111);pLegR.position.set(.2,.45,0);pLegR.geometry.translate(0,-.42,0);player.add(pLegR);
 
-var pHelmet=box(.7,.35,.7,0x00d4ff,0x003355,0.6);
-pHelmet.position.y=2.55;player.add(pHelmet);
+player.position.set(0,0,0);sc.add(player);
 
-var pVisor=box(.62,.2,.1,0x00ffff,0x00aaaa,0.5);
-pVisor.position.set(0,2.4,0.28);player.add(pVisor);
+// Name tag billboard
+var nameCanvas=document.createElement('canvas');nameCanvas.width=256;nameCanvas.height=48;
+var nCtx=nameCanvas.getContext('2d');
+nCtx.fillStyle='rgba(0,20,40,0.7)';nCtx.roundRect(0,0,256,48,8);nCtx.fill();
+nCtx.font='bold 22px Courier New';nCtx.fillStyle='#00ff88';nCtx.textAlign='center';
+nCtx.fillText('Veri Muhafizi',128,32);
+var nameTex=new THREE.CanvasTexture(nameCanvas);
+var nameSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:nameTex,transparent:true}));
+nameSprite.scale.set(2.5,0.5,1);nameSprite.position.y=3.1;
+player.add(nameSprite);
 
-var pArmL=box(.28,.9,.28,0xeeeeff,0x111122);
-pArmL.position.set(-.62,1.5,0);pArmL.geometry.translate(0,-.45,0);player.add(pArmL);
-var pArmR=box(.28,.9,.28,0xeeeeff,0x111122);
-pArmR.position.set(.62,1.5,0);pArmR.geometry.translate(0,-.45,0);player.add(pArmR);
+var pAngle=0,pMoving=false,pVelY=0,isJumping=false;
 
-var pLegL=box(.28,.9,.28,0x444455,0x111111);
-pLegL.position.set(-.22,.45,0);pLegL.geometry.translate(0,-.45,0);player.add(pLegL);
-var pLegR=box(.28,.9,.28,0x444455,0x111111);
-pLegR.position.set(.22,.45,0);pLegR.geometry.translate(0,-.45,0);player.add(pLegR);
-
-player.position.set(0,0,0);
-sc.add(player);
-
-var pAngle=0,pMoving=false;
-
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
    MAP BUILDER
-   ═══════════════════════════════════════════════════════ */
-var mapObjs=[];
-var particles=[];
-
-function clearMap(){
-  mapObjs.forEach(function(o){sc.remove(o)});mapObjs.length=0;
-  particles.forEach(function(o){sc.remove(o)});particles.length=0;
-}
-
-function addToMap(m){sc.add(m);mapObjs.push(m);return m;}
+   ============================================================= */
+function clearMap(){mapO.forEach(function(o){sc.remove(o)});mapO.length=0;particles.forEach(function(o){sc.remove(o)});particles.length=0;}
 
 function buildFloor(cx,cz,w,h,col){
-  for(var x=0;x<w;x++)for(var z=0;z<h;z++){
-    var f=box(1,.3,1,col,0x000000);
-    f.position.set(cx-w/2+x+.5,-.15,cz-h/2+z+.5);
-    f.receiveShadow=true;addToMap(f);
-  }
+  var g=new THREE.BoxGeometry(w,0.25,h);
+  var m=new THREE.MeshPhongMaterial({color:col});
+  var f=new THREE.Mesh(g,m);f.position.set(cx,-.12,cz);f.receiveShadow=true;addM(f);
 }
 
 function buildPath(x1,z1,x2,z2){
-  var dx=Math.sign(x2-x1),dz=Math.sign(z2-z1);
-  var cx=x1,cz=z1;
-  while(cx!==x2){
-    var p=box(1,.15,1,0x667788);p.position.set(cx,-.05,cz);addToMap(p);cx+=dx;
-  }
-  while(cz!==z2){
-    var p2=box(1,.15,1,0x667788);p2.position.set(cx,-.05,cz);addToMap(p2);cz+=dz;
-  }
+  var dx=x2-x1,dz=z2-z1,len=Math.sqrt(dx*dx+dz*dz);
+  if(len<1)return;
+  var g=new THREE.BoxGeometry(Math.abs(dx)<1?1.2:Math.abs(dx),.12,Math.abs(dz)<1?1.2:Math.abs(dz));
+  var m=new THREE.MeshPhongMaterial({color:0x556677});
+  var p=new THREE.Mesh(g,m);p.position.set((x1+x2)/2,.01,(z1+z2)/2);p.receiveShadow=true;addM(p);
 }
 
 function buildTree(x,z){
-  var trunk=box(.3,1.5,.3,0x8B4513,0x221100);trunk.position.set(x,.75,z);addToMap(trunk);
-  var leaves=box(1.2,1.2,1.2,0x228B22,0x114411);leaves.position.set(x,2,z);addToMap(leaves);
+  var tr=box(.25,1.6,.25,0x8B4513,0x221100);tr.position.set(x,.8,z);addM(tr);
+  var lv=box(1.1,1.1,1.1,0x228B22,0x0a330a);lv.position.set(x,2.0,z);addM(lv);
 }
 
 function buildLamp(x,z){
-  var pole=box(.15,2,.15,0x555555);pole.position.set(x,1,z);addToMap(pole);
-  var light=box(.3,.3,.3,0xffdd44,0xffaa00);light.position.set(x,2.2,z);addToMap(light);
-  var pl=new THREE.PointLight(0xffdd44,.5,8);pl.position.set(x,2.5,z);sc.add(pl);mapObjs.push(pl);
+  addM(box(.12,2.2,.12,0x555555)).position.set(x,1.1,z);
+  var lb=box(.28,.28,.28,0xffdd44,0xffaa00);lb.position.set(x,2.35,z);addM(lb);
+  var pl=new THREE.PointLight(0xffdd44,0.4,8);pl.position.set(x,2.6,z);sc.add(pl);mapO.push(pl);
 }
 
-function buildAntenna(x,z,h){
-  for(var y=0;y<h;y++){var b=box(.5,1,.5,0x888888);b.position.set(x,y+.5,z);addToMap(b);}
-  var tip=box(.3,.3,.3,0xff0000,0xff0000);tip.position.set(x,h+.15,z);tip.userData.blink=true;addToMap(tip);
+function buildAntenna(x,z,h,blinkCol){
+  for(var y=0;y<h;y++){addM(box(.4,.95,.4,0x888899)).position.set(x,y+.47,z);}
+  var tip=box(.28,.28,.28,blinkCol||0xff0000,blinkCol||0xff0000);
+  tip.position.set(x,h+.14,z);tip.userData.blink=true;addM(tip);
 }
 
 function buildParabola(x,z){
   for(var dx=-1;dx<=1;dx++)for(var dz=-1;dz<=1;dz++){
-    var y=(dx===0&&dz===0)?1:1.5;
-    var b=box(.9,.3,.9,0xaaaaaa);b.position.set(x+dx,y,z+dz);addToMap(b);
+    var y2=(dx===0&&dz===0)?1:1.5;
+    addM(box(.85,.25,.85,0xaaaaaa)).position.set(x+dx,y2,z+dz);
   }
-  var base=box(.4,1.5,.4,0x666666);base.position.set(x,.5,z);addToMap(base);
+  var base=box(.35,1.4,.35,0x666666);base.position.set(x,.7,z);addM(base);
+  base.userData.spinSlow=true;
 }
 
 function buildWorld(){
   clearMap();
 
-  // Base ground (dark)
-  var groundG=new THREE.PlaneGeometry(60,60);
-  var groundM=new THREE.MeshPhongMaterial({color:0x111820});
-  var ground=new THREE.Mesh(groundG,groundM);
-  ground.rotation.x=-Math.PI/2;ground.position.y=-.3;ground.receiveShadow=true;
-  addToMap(ground);
+  // Ground
+  var gnd=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshPhongMaterial({color:0x111820}));
+  gnd.rotation.x=-Math.PI/2;gnd.position.y=-.25;gnd.receiveShadow=true;addM(gnd);
 
-  // ── Zone 1: Center Control Station ──
-  buildFloor(0,0,8,8,0x0a3a4a);
-  // Antenna
-  buildAntenna(0,0,5);
-  // Terminals (green cubes)
-  var tps=[[-2,3],[2,3],[-2,-3],[2,-3]];
-  tps.forEach(function(p){var t=box(.5,.5,.5,0x00ff88,0x004422);t.position.set(p[0],.55,p[1]);addToMap(t);});
+  /* ── ZONE 1: CENTER ── */
+  buildFloor(0,0,9,9,0x0a3a4a);
+  buildAntenna(0,0,6,0xff0000);
+  // Hologram ring particles
+  for(var hi=0;hi<20;hi++){
+    var hp=box(.12,.12,.12,0x00d4ff,0x00aaff,0.6);
+    hp.userData.holo=true;hp.userData.angle=hi/20*Math.PI*2;hp.userData.radius=2.5;
+    hp.position.set(Math.cos(hp.userData.angle)*2.5,4,Math.sin(hp.userData.angle)*2.5);
+    sc.add(hp);particles.push(hp);
+  }
+  // Terminals
+  [[-3,3],[3,3],[-3,-3],[3,-3]].forEach(function(p){
+    var tb=box(.5,.5,.5,0x00ff88,0x004422);tb.position.set(p[0],.55,p[1]);addM(tb);
+  });
 
-  // ── Zone 2: Weather (NW) ──
-  buildFloor(-12,-12,10,10,0x1a2a4a);
-  // Sensor poles
-  for(var i=0;i<4;i++){
-    var sx=-15+i*3,sz=-12;
-    var pole=box(.2,3,.2,0x888888);pole.position.set(sx,1.5,sz);addToMap(pole);
-    var sens=box(.5,.5,.5,0x3b82f6,0x112244);sens.position.set(sx,3.3,sz);addToMap(sens);
+  /* ── ZONE 2: WEATHER (NW) ── */
+  buildFloor(-13,-13,11,11,0x1a2a4a);
+  for(var si=0;si<4;si++){
+    var sx=-16+si*2.5,sz=-13;
+    addM(box(.15,3.2,.15,0x888899)).position.set(sx,1.6,sz);
+    var sens=box(.45,.45,.45,0x3b82f6,0x112244);sens.position.set(sx,3.4,sz);addM(sens);
   }
-  // Wind turbines
-  for(var w=0;w<2;w++){
-    var wx=-10+w*4,wz=-15;
-    var tb=box(.3,4,.3,0xaaaaaa);tb.position.set(wx,2,wz);addToMap(tb);
-    var blade=box(2,.15,.15,0xcccccc);blade.position.set(wx,4.2,wz);blade.userData.spin=true;addToMap(blade);
+  // Turbines
+  for(var wi=0;wi<2;wi++){
+    var wx=-11+wi*5,wz=-16;
+    addM(box(.2,4.5,.2,0xaaaaaa)).position.set(wx,2.25,wz);
+    var blade=box(2.4,.12,.12,0xcccccc);blade.position.set(wx,4.6,wz);blade.userData.spin=true;addM(blade);
   }
-  // Rain particles
-  for(var r=0;r<40;r++){
-    var rp=box(.05,.3,.05,0x4488ff,0x2244aa,0.6);
-    rp.position.set(-12+Math.random()*10-5,Math.random()*6,-12+Math.random()*10-5);
-    rp.userData.rain=true;rp.userData.vy=4+Math.random()*3;
+  // Thermometer
+  addM(box(.15,2,.15,0x3344ff,0x1122aa)).position.set(-10,-10,1);
+  addM(box(.15,.8,.15,0xff3333,0xaa1111)).position.set(-10,-10,1.6);
+  // Rain
+  for(var ri=0;ri<50;ri++){
+    var rp=box(.04,.35,.04,0x4488ff,0x2244aa,0.55);
+    rp.position.set(-13+Math.random()*11-5.5,Math.random()*7,-13+Math.random()*11-5.5);
+    rp.userData.rain=true;rp.userData.vy=5+Math.random()*3;
     sc.add(rp);particles.push(rp);
   }
 
-  // ── Zone 3: Farm (SE) ──
-  var fColors=[0x228B22,0x228B22,0xBDB76B,0x8B4513,0x228B22,0xBDB76B,0x228B22,0x228B22,0x8B4513];
+  /* ── ZONE 3: FARM (SE) ── */
+  var fc=[0x228B22,0x228B22,0xBDB76B,0x228B22,0x8B4513,0x228B22,0xBDB76B,0x228B22,0x228B22];
   for(var fx=0;fx<3;fx++)for(var fz=0;fz<3;fz++){
-    var col=fColors[fx*3+fz];
-    buildFloor(10+fx*3,10+fz*3,3,3,col);
+    buildFloor(11+fx*3,11+fz*3,2.8,2.8,fc[fx*3+fz]);
   }
-  // Irrigation channels (blue lines)
+  // Irrigation
   for(var ic=0;ic<3;ic++){
-    var ch=box(.2,.1,9,0x0066cc,0x003366);ch.position.set(10+ic*3+1.5,0,12.5);addToMap(ch);
+    addM(box(.2,.08,9,0x0066cc,0x003366)).position.set(11+ic*3+1.5,.02,13.5);
   }
   // Drone pad
-  var dpad=box(2,.1,2,0x888888);dpad.position.set(15,.01,15);addToMap(dpad);
-  var dmark=box(1.5,.12,.2,0xffff00);dmark.position.set(15,.05,15);addToMap(dmark);
-  var dmark2=box(.2,.12,1.5,0xffff00);dmark2.position.set(15,.05,15);addToMap(dmark2);
+  addM(box(2,.08,2,0x888888)).position.set(16,.01,16);
+  addM(box(1.4,.1,.15,0xffff00)).position.set(16,.04,16);
+  addM(box(.15,.1,1.4,0xffff00)).position.set(16,.04,16);
+  // Tractor
+  var tractor=box(1,.7,.6,0xcc4444,0x441111);tractor.position.set(10,.6,10);addM(tractor);
+  addM(box(.35,.35,.35,0x333333)).position.set(10.5,.18,10);
+  addM(box(.35,.35,.35,0x333333)).position.set(9.5,.18,10);
 
-  // ── Zone 4: Disaster (SW) ──
-  buildFloor(-12,12,10,10,0x4a2a1a);
-  // Ruined buildings
-  for(var rb=0;rb<5;rb++){
-    var rx=-14+rb*2,rz=12+Math.floor(Math.random()*6);
+  /* ── ZONE 4: DISASTER (SW) ── */
+  buildFloor(-13,13,11,11,0x4a2a1a);
+  for(var rb=0;rb<6;rb++){
+    var rx=-16+rb*2,rz=11+Math.floor(Math.random()*7);
     var rh=Math.floor(Math.random()*3)+1;
     for(var ry=0;ry<rh;ry++){
-      var ruin=box(.9,.9,.9,0x554433);ruin.position.set(rx,ry+.5,rz);
-      ruin.rotation.x=(Math.random()-.5)*.2;ruin.rotation.z=(Math.random()-.5)*.2;
-      addToMap(ruin);
+      var ruin=box(.85,.85,.85,0x554433,0x110000);
+      ruin.position.set(rx,ry+.42,rz);
+      ruin.rotation.x=(Math.random()-.5)*.25;ruin.rotation.z=(Math.random()-.5)*.25;
+      addM(ruin);
     }
   }
   // Helipad
-  var hpad=box(3,.1,3,0x666666);hpad.position.set(-10,.01,15);addToMap(hpad);
-  var hh=box(1.8,.12,.2,0xffffff);hh.position.set(-10,.05,15);addToMap(hh);
-  var hv=box(.2,.12,1.8,0xffffff);hv.position.set(-10,.05,15);addToMap(hv);
-  // Smoke particles
-  for(var sm=0;sm<25;sm++){
-    var sp=box(.3,.3,.3,0x888888,0x333333,0.4);
-    sp.position.set(-12+Math.random()*8-4,Math.random()*4,12+Math.random()*8-4);
-    sp.userData.smoke=true;sp.userData.vy=0.5+Math.random();
-    sc.add(sp);particles.push(sp);
+  addM(box(3,.08,3,0x555555)).position.set(-11,.01,16);
+  addM(box(1.6,.1,.18,0xffffff)).position.set(-11,.04,16);
+  addM(box(.18,.1,1.6,0xffffff)).position.set(-11,.04,16);
+  // Siren
+  var siren=box(.3,.3,.3,0xff0000,0xff0000);siren.position.set(-9,2,14);siren.userData.blink=true;addM(siren);
+  addM(box(.12,2,.12,0x555555)).position.set(-9,1,14);
+  // Fire particles
+  for(var fi=0;fi<30;fi++){
+    var fp=box(.18,.18,.18,Math.random()>.5?0xff4400:0xff8800,0xff2200,0.7);
+    fp.position.set(-13+Math.random()*10-5,Math.random()*3,13+Math.random()*10-5);
+    fp.userData.fire=true;fp.userData.vy=1+Math.random()*2;
+    sc.add(fp);particles.push(fp);
   }
 
-  // ── Zone 5: Comms (NE) ──
-  buildFloor(12,-12,10,10,0x222233);
-  // Parabolic antennas
-  buildParabola(10,-12);buildParabola(15,-14);
-  // Server room (glass blocks)
-  for(var sx2=13;sx2<=15;sx2++)for(var sz2=-10;sz2<=-8;sz2++){
-    var sv=box(.95,2,.95,0x225522,0x00ff00,0.3);sv.position.set(sx2,1,sz2);addToMap(sv);
+  /* ── ZONE 5: COMMS (NE) ── */
+  buildFloor(13,-13,11,11,0x1a1a2a);
+  buildParabola(11,-13);buildParabola(16,-15);
+  // Server room
+  for(var svx=14;svx<=16;svx++)for(var svz=-11;svz<=-9;svz++){
+    var sv=box(.9,2,.9,0x225522,0x00ff00,0.25);sv.position.set(svx,1,svz);addM(sv);sv.userData.serverGlow=true;
+  }
+  // Data flow particles
+  for(var di=0;di<15;di++){
+    var dp=box(.08,.08,.08,0x00ff00,0x00ff00,0.7);
+    dp.position.set(14+Math.random()*3,Math.random()*3,-10+Math.random()*2);
+    dp.userData.dataFlow=true;dp.userData.vy=1.5+Math.random()*2;
+    sc.add(dp);particles.push(dp);
   }
   // Comm tower
-  buildAntenna(12,-15,7);
+  buildAntenna(13,-16,8,0xff0000);
 
-  // ── Paths between zones ──
-  buildPath(4,0,10,0);   // center -> comms direction
-  buildPath(0,4,0,10);   // center -> farm direction
-  buildPath(-4,0,-10,0); // center -> weather direction
-  buildPath(0,-4,0,-10); // center -> comms direction
-  buildPath(4,0,4,10);   // shortcut
-  buildPath(-4,0,-4,10); // shortcut
-  buildPath(4,0,4,-10);
-  buildPath(-4,0,-4,-10);
-  // Diagonal connectors
-  buildPath(4,4,10,10);  // to farm
-  buildPath(-4,-4,-10,-10); // to weather
-  buildPath(-4,4,-10,10);  // to disaster
-  buildPath(4,-4,10,-10);  // to comms
+  /* ── PATHS ── */
+  buildPath(4.5,0,9,0);buildPath(-4.5,0,-9,0);buildPath(0,4.5,0,9);buildPath(0,-4.5,0,-9);
+  buildPath(5,5,9,9);buildPath(-5,-5,-9,-9);buildPath(-5,5,-9,9);buildPath(5,-5,9,-9);
 
-  // ── Lamps along paths ──
-  var lampPos=[[5,0],[-5,0],[0,5],[0,-5],[7,7],[-7,-7],[-7,7],[7,-7]];
-  lampPos.forEach(function(lp){buildLamp(lp[0],lp[1]);});
+  /* ── LAMPS ── */
+  [[6,0],[-6,0],[0,6],[0,-6],[7,7],[-7,-7],[-7,7],[7,-7]].forEach(function(l){buildLamp(l[0],l[1]);});
 
-  // ── Trees ──
-  var treePos=[[6,5],[-6,5],[6,-5],[-6,-5],[3,8],[-3,8],[8,3],[-8,3],[3,-8],[-3,-8],[8,-3],[-8,-3]];
-  treePos.forEach(function(tp){buildTree(tp[0],tp[1]);});
+  /* ── TREES ── */
+  [[6,4],[-6,4],[6,-4],[-6,-4],[3,7],[-3,7],[7,3],[-7,3],[3,-7],[-3,-7],[7,-3],[-7,-3],[-2,9],[2,-9]].forEach(function(t){buildTree(t[0],t[1]);});
 }
 
 buildWorld();
 
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
+   RETURN BEACON (3-phase)
+   ============================================================= */
+var returnBeacon=null;
+function spawnReturnBeacon(x,z){
+  removeReturnBeacon();
+  returnBeacon=box(.9,1.8,.9,0x00ff88,0x00ff88,0.5);
+  returnBeacon.position.set(x,.9,z);
+  returnBeacon.userData.isReturn=true;
+  sc.add(returnBeacon);
+}
+function removeReturnBeacon(){
+  if(returnBeacon){sc.remove(returnBeacon);returnBeacon=null;}
+}
+
+/* =============================================================
    INPUT
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 var keys={};
 document.addEventListener('keydown',function(e){
   keys[e.key.toLowerCase()]=true;
+  if(e.key==='Shift')shiftDown=true;
   if(e.code==='Space'){e.preventDefault();handleInteract();}
 });
-document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;});
-document.addEventListener('mousemove',function(e){
-  if(document.pointerLockElement)pAngle-=e.movementX*0.003;
-});
-ren.domElement.addEventListener('click',function(){
-  if(mActive)ren.domElement.requestPointerLock();
-});
+document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;if(e.key==='Shift')shiftDown=false;});
+document.addEventListener('mousemove',function(e){if(document.pointerLockElement)pAngle-=e.movementX*0.003;});
+ren.domElement.addEventListener('click',function(){if(mActive)ren.domElement.requestPointerLock();});
 
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
    GUIDE TEXT
-   ═══════════════════════════════════════════════════════ */
-var guideEl=document.getElementById('guide');
-var guideTimer=null;
+   ============================================================= */
+var guideEl=document.getElementById('guide'),guideTmr=null;
 function showGuide(txt,dur){
-  guideEl.textContent=txt;guideEl.className='show';guideEl.style.display='block';guideEl.style.opacity='0';
-  setTimeout(function(){guideEl.style.opacity='1';},50);
-  if(guideTimer)clearTimeout(guideTimer);
-  if(dur)guideTimer=setTimeout(function(){guideEl.style.opacity='0';setTimeout(function(){guideEl.style.display='none';},500);},dur);
+  guideEl.textContent=txt;guideEl.className='show';guideEl.style.display='block';
+  setTimeout(function(){guideEl.style.opacity='1';},30);
+  if(guideTmr)clearTimeout(guideTmr);
+  if(dur)guideTmr=setTimeout(hideGuide,dur);
 }
 function hideGuide(){guideEl.style.opacity='0';setTimeout(function(){guideEl.style.display='none';},500);}
 
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
+   TASK PANEL UPDATE
+   ============================================================= */
+function updateTaskPanel(mission,phaseStr){
+  document.getElementById('task-name').textContent=mission.name;
+  document.getElementById('task-desc').textContent=mission.desc;
+  var stepsEl=document.getElementById('task-steps');
+  var s1='step '+(phaseStr==='collect'||phaseStr==='return'?'done':'active');
+  var s2='step '+(phaseStr==='collect'?'active':(phaseStr==='return'?'done':'locked'));
+  var s3='step '+(phaseStr==='return'?'active':'locked');
+  stepsEl.innerHTML=
+    '<div class="'+s1+'">'+( phaseStr!=='none'?'&#x2705;':'&#x1F50D;')+' Pipeline veriyi analiz etti</div>'+
+    '<div class="'+s2+'">'+(phaseStr==='return'?'&#x2705;':'&#x1F3AF;')+' '+mission.collectText+' ('+collected+'/'+tCount+')</div>'+
+    '<div class="'+s3+'">&#x1F6A9; '+mission.returnText+'</div>';
+  var zn=mission.zone==='all'?'Tum Bolgeler':ZONE_N[phaseStr==='return'?mission.returnZone:mission.zone];
+  document.getElementById('task-zone').textContent=zn;
+}
+
+function updateTaskPipeline(pr){
+  var l1=pr.l1||0,l2=pr.l2||0,l3=pr.l3||0,l4=pr.l4||0;
+  var total=pr.faults;var pct=total>0?((pr.corrected/total)*100).toFixed(0):0;
+  var maxBar=Math.max(l1,l2,l3,l4,1);
+  document.getElementById('task-pipeline').innerHTML=
+    'Anomali: '+total+' ('+((total/pr.dataPoints)*100).toFixed(0)+'%)<br>'+
+    '<span style="color:#8bb8d4">L1 Hard:</span> '+l1+' | <span style="color:#8bb8d4">L2 Stat:</span> '+l2+'<br>'+
+    '<span style="color:#8bb8d4">L3 ML:</span> '+l3+' | <span style="color:#8bb8d4">L4 Deep:</span> '+l4+'<br>'+
+    'Temizleme: %'+pct+' | Sure: '+pr.time+'s';
+}
+
+/* =============================================================
    TARGETS
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 function spawnTargets(mission){
   clearTargets();collected=0;tCount=mission.targetCount;
   var zone=mission.zone;
-  for(var i=0;i<mission.targetCount;i++){
-    var mat=new THREE.MeshPhongMaterial({
-      color:mission.color,
-      emissive:new THREE.Color(mission.color).multiplyScalar(0.4),
-      transparent:true,opacity:0.9
-    });
+  for(var i=0;i<tCount;i++){
+    var mat=new THREE.MeshPhongMaterial({color:mission.color,emissive:new THREE.Color(mission.color).multiplyScalar(0.4),transparent:true,opacity:0.9});
     var t=new THREE.Mesh(new THREE.BoxGeometry(.8,.8,.8),mat);
     var px,pz;
     if(zone==='all'){
-      // Spread across all zones
-      var zones=['center','weather','farm','disaster','comms'];
-      var zn=zones[i%zones.length];
-      var zc=ZONE_CENTERS[zn];
-      px=zc.x+(Math.random()-.5)*8;
-      pz=zc.z+(Math.random()-.5)*8;
-    } else if(zone==='center'){
-      px=(Math.random()-.5)*6;pz=(Math.random()-.5)*6;
+      var zns=['center','weather','farm','disaster','comms'];
+      var zc=ZONE_C[zns[i%zns.length]];
+      px=zc.x+(Math.random()-.5)*8;pz=zc.z+(Math.random()-.5)*8;
     } else {
-      var zc2=ZONE_CENTERS[zone];
-      px=zc2.x+(Math.random()-.5)*8;
-      pz=zc2.z+(Math.random()-.5)*8;
+      var zc2=ZONE_C[zone];px=zc2.x+(Math.random()-.5)*8;pz=zc2.z+(Math.random()-.5)*8;
     }
-    t.position.set(px,1.2,pz);
-    t.castShadow=true;
+    t.position.set(px,1.2,pz);t.castShadow=true;
     t.userData={isTarget:true,collected:false,origY:1.2};
     sc.add(t);targets.push(t);
   }
 }
-
 function clearTargets(){targets.forEach(function(t){sc.remove(t)});targets.length=0;}
 
 function handleInteract(){
   if(!mActive)return;
-  targets.forEach(function(t){
-    if(t.userData.collected)return;
-    var d=player.position.distanceTo(t.position);
-    if(d<2.5){
-      t.userData.collected=true;
-      t.material.emissive.setHex(0x00ff88);
-      t.scale.set(1.4,1.4,1.4);
-      setTimeout(function(){t.visible=false;},300);
-      collected++;
-      document.getElementById('h-prg').textContent=collected+' / '+tCount;
-      showGuide(collected+' / '+tCount+' tamamlandi! Kalan hedefleri bul!',3000);
-      if(collected>=tCount)completeMission();
+  if(missionPhase==='collect'){
+    targets.forEach(function(t){
+      if(t.userData.collected)return;
+      if(player.position.distanceTo(t.position)<2.5){
+        t.userData.collected=true;t.material.emissive.setHex(0x00ff88);
+        t.scale.set(1.3,1.3,1.3);setTimeout(function(){t.visible=false;},250);
+        collected++;
+        document.getElementById('h-prg').textContent=collected+'/'+tCount;
+        showGuide(collected+'/'+tCount+' tamamlandi!',2500);
+        if(collected>=tCount) goToReturnPhase();
+      }
+    });
+  } else if(missionPhase==='return'){
+    if(returnBeacon&&player.position.distanceTo(returnBeacon.position)<3){
+      completeMission();
     }
-  });
+  }
+  // Jump when not interacting
+  if(!isJumping&&missionPhase!=='return'){pVelY=5;isJumping=true;}
 }
 
-/* ═══════════════════════════════════════════════════════
+function goToReturnPhase(){
+  missionPhase='return';
+  var m=getMs()[mIdx];
+  var rz=ZONE_C[m.returnZone];
+  spawnReturnBeacon(rz.x,rz.z);
+  showGuide(m.returnText,6000);
+  updateTaskPanel(m,'return');
+}
+
+/* =============================================================
+   COMPASS / DIRECTION ARROW
+   ============================================================= */
+function updateCompass(){
+  var arrowEl=document.getElementById('compass-arrow');
+  var distEl=document.getElementById('compass-dist');
+  var actEl=document.getElementById('compass-action');
+  if(!mActive){arrowEl.style.display='none';distEl.textContent='';actEl.style.display='none';return;}
+
+  var targetPos=null,minD=9999;
+  if(missionPhase==='collect'){
+    targets.forEach(function(t){
+      if(!t.userData.collected){
+        var d=player.position.distanceTo(t.position);
+        if(d<minD){minD=d;targetPos=t.position;}
+      }
+    });
+  } else if(missionPhase==='return'&&returnBeacon){
+    targetPos=returnBeacon.position;minD=player.position.distanceTo(returnBeacon.position);
+  }
+
+  if(!targetPos){arrowEl.style.display='none';distEl.textContent='';actEl.style.display='none';return;}
+
+  if(minD<3){
+    arrowEl.style.display='none';distEl.textContent='';
+    actEl.style.display='block';
+  } else {
+    actEl.style.display='none';arrowEl.style.display='inline-block';
+    var dx=targetPos.x-player.position.x,dz=targetPos.z-player.position.z;
+    var angle=Math.atan2(dx,-dz)-pAngle;
+    arrowEl.style.transform='rotate('+angle+'rad)';
+    distEl.textContent=Math.floor(minD)+' blok';
+  }
+
+  // Distance in task panel
+  document.getElementById('task-distance').textContent='↗ '+Math.floor(minD)+' blok uzakta';
+}
+
+/* =============================================================
+   MINIMAP
+   ============================================================= */
+var mmCanvas=document.getElementById('minimap-canvas');
+var mmCtx=mmCanvas.getContext('2d');
+
+function drawMinimap(){
+  mmCtx.fillStyle='#0a1020';mmCtx.fillRect(0,0,140,140);
+  var s=140/50,ox=70,oz=70;
+
+  // Zone areas
+  var zones=[
+    {x:0,z:0,w:9,h:9,c:'rgba(0,60,80,.4)'},
+    {x:-13,z:-13,w:11,h:11,c:'rgba(30,40,80,.4)'},
+    {x:13,z:13,w:11,h:11,c:'rgba(30,80,30,.4)'},
+    {x:-13,z:13,w:11,h:11,c:'rgba(80,40,20,.4)'},
+    {x:13,z:-13,w:11,h:11,c:'rgba(30,30,50,.4)'}
+  ];
+  zones.forEach(function(z){
+    mmCtx.fillStyle=z.c;
+    mmCtx.fillRect(ox+z.x*s-z.w*s/2,oz+z.z*s-z.h*s/2,z.w*s,z.h*s);
+  });
+
+  // Targets
+  targets.forEach(function(t){
+    if(!t.userData.collected){
+      mmCtx.fillStyle='#f59e0b';mmCtx.fillRect(ox+t.position.x*s-2,oz+t.position.z*s-2,4,4);
+    }
+  });
+
+  // Return beacon
+  if(returnBeacon){
+    mmCtx.fillStyle='#00ff88';
+    mmCtx.beginPath();mmCtx.arc(ox+returnBeacon.position.x*s,oz+returnBeacon.position.z*s,4,0,Math.PI*2);mmCtx.fill();
+  }
+
+  // Player
+  mmCtx.fillStyle='#ffffff';
+  mmCtx.beginPath();mmCtx.arc(ox+player.position.x*s,oz+player.position.z*s,3,0,Math.PI*2);mmCtx.fill();
+
+  // North indicator
+  mmCtx.fillStyle='#ff4444';mmCtx.font='bold 9px monospace';mmCtx.fillText('N',66,10);
+}
+
+/* =============================================================
    GAME FLOW
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 function getMs(){return stg===1?MISSIONS.stage1:MISSIONS.stage2;}
 
 function startNext(){
   var ms=getMs();
   if(mIdx>=ms.length){stageComplete();return;}
-  phase='pipeline';
+  phase='pipeline';missionPhase='none';
   showPipeline(ms[mIdx]);
+}
+
+function genPipelineResult(){
+  var dp=2000+Math.floor(Math.random()*1000);
+  var l1=Math.floor(Math.random()*150)+20;
+  var l2=Math.floor(Math.random()*30)+1;
+  var l3=Math.floor(Math.random()*120)+10;
+  var l4=Math.floor(Math.random()*100)+10;
+  var faults=l1+l2+l3+l4;
+  var corrected=Math.floor(faults*(0.7+Math.random()*0.25));
+  return{dataPoints:dp,faults:faults,corrected:corrected,l1:l1,l2:l2,l3:l3,l4:l4,
+    time:(Math.random()*5+1).toFixed(2),confidence:(70+Math.random()*25).toFixed(0)};
 }
 
 function showPipeline(mission){
   var p=document.getElementById('pipeline-overlay');p.style.display='block';
   var steps=['ps1','ps2','ps3','ps4','ps5','ps6'];
-  var labels=['Veri aliniyor...','Trend analizi...','9 detektor calisiyor...','Oylama yapiliyor...','Filtreler uygulaniyor...','Dogrulama...'];
+  var labels=['Veri aliniyor...','Trend kaldiriliyor...','9 detektor calisiyor...','Ensemble oylama...','Mercek filtreleme...','Dogrulama...'];
   var step=0;
   var iv=setInterval(function(){
     if(step>0)document.getElementById(steps[step-1]).className='ps d';
-    if(step<steps.length){
-      document.getElementById(steps[step]).className='ps a';
-      document.getElementById('ps-st').textContent=labels[step];
-    }
+    if(step<steps.length){document.getElementById(steps[step]).className='ps a';document.getElementById('ps-st').textContent=labels[step];}
     step++;
     if(step>steps.length){
       clearInterval(iv);
-      pResult={faults:Math.floor(Math.random()*200)+50,corrected:Math.floor(Math.random()*180)+50,time:(Math.random()*3+.5).toFixed(2)};
-      document.getElementById('ps-st').textContent='Tamamlandi: '+pResult.faults+' anomali bulundu';
+      pResult=genPipelineResult();
+      document.getElementById('ps-st').textContent='Tamamlandi: '+pResult.faults+' anomali!';
       document.getElementById('ps-st').style.color='#00ff88';
       setTimeout(function(){
         p.style.display='none';
         steps.forEach(function(s){document.getElementById(s).className='ps';});
         document.getElementById('ps-st').style.color='#8bb8d4';
         showBriefing(mission);
-      },1200);
+      },1000);
     }
-  },400);
+  },350);
 }
 
 function showBriefing(mission){
@@ -475,63 +754,84 @@ function showBriefing(mission){
   var p=document.getElementById('mission-panel');
   document.getElementById('mp-t').textContent=mission.name;
   document.getElementById('mp-d').textContent=mission.desc;
-  document.getElementById('mp-p').innerHTML='Pipeline Sonucu:<br>Anomali: '+pResult.faults+' tespit | '+pResult.corrected+' duzeltildi<br>Sure: '+pResult.time+'s | Guven: '+(70+Math.random()*25).toFixed(0)+'%';
+
+  // Pipeline result with layer bars
+  var maxL=Math.max(pResult.l1,pResult.l2,pResult.l3,pResult.l4,1);
+  document.getElementById('pr-data').innerHTML=
+    '<div class="pr-row"><span>Veri Noktasi</span><span class="pr-val">'+pResult.dataPoints+'</span></div>'+
+    '<div class="pr-row"><span>Toplam Anomali</span><span class="pr-val">'+pResult.faults+' ('+((pResult.faults/pResult.dataPoints)*100).toFixed(0)+'%)</span></div>';
+
+  document.getElementById('pr-layers').innerHTML=
+    '<div style="margin:6px 0 3px;color:#00d4ff;font-size:10px;font-weight:bold">DETEKTOR KATMANLARI</div>'+
+    layerBar('L1 Hard',pResult.l1,maxL,'#ef4444')+
+    layerBar('L2 Stat',pResult.l2,maxL,'#f59e0b')+
+    layerBar('L3 ML',pResult.l3,maxL,'#3b82f6')+
+    layerBar('L4 Deep',pResult.l4,maxL,'#8b5cf6');
+
+  var pct=pResult.faults>0?((pResult.corrected/pResult.faults)*100).toFixed(0):'0';
+  document.getElementById('pr-summary').innerHTML=
+    '<div class="pr-row" style="margin-top:6px"><span>Temizleme</span><span class="pr-val">%'+pct+'</span></div>'+
+    '<div class="pr-row"><span>Sure</span><span class="pr-val">'+pResult.time+'s</span></div>'+
+    '<div class="pr-row"><span>Guven</span><span class="pr-val">%'+pResult.confidence+'</span></div>';
+
   document.getElementById('mp-o').textContent=mission.objective;
   document.getElementById('mp-btn').textContent='\u25B6 GOREVE BASLA';
-  document.getElementById('mp-btn').onclick=function(){
-    p.style.display='none';
-    beginMission(mission);
-  };
+  document.getElementById('mp-btn').onclick=function(){p.style.display='none';beginMission(mission);};
   p.style.display='block';
 }
 
+function layerBar(label,val,max,color){
+  var w=Math.max((val/max)*100,2);
+  return '<div class="layer-bar"><span class="layer-label">'+label+'</span>'+
+    '<div class="layer-bar-bg"><div class="layer-bar-fg" style="width:'+w+'%;background:'+color+'"></div></div>'+
+    '<span class="layer-val">'+val+'</span></div>';
+}
+
 function beginMission(mission){
-  phase='playing';mActive=true;mStartTime=performance.now();
-  // Move player to zone
-  var zc=ZONE_CENTERS[mission.zone==='all'?'center':mission.zone];
-  player.position.set(zc.x,0,zc.z+4);
+  phase='playing';mActive=true;missionPhase='collect';mStartTime=performance.now();
+  var zc=ZONE_C[mission.zone==='all'?'center':mission.zone];
+  player.position.set(0,0,2);
   spawnTargets(mission);
   document.getElementById('h-mis').textContent=mission.name;
-  document.getElementById('h-prg').textContent='0 / '+mission.targetCount;
-  var zoneName=mission.zone==='all'?'Tum Bolgeler':ZONE_NAMES[mission.zone];
-  showGuide(zoneName+'! '+mission.objective,5000);
+  document.getElementById('h-prg').textContent='0/'+tCount;
+  updateTaskPanel(mission,'collect');
+  updateTaskPipeline(pResult);
+  var zname=mission.zone==='all'?'Tum Bolgeler':ZONE_N[mission.zone];
+  showGuide(zname+'na git! '+mission.collectText,5000);
 }
 
 function completeMission(){
-  mActive=false;phase='complete';
+  mActive=false;missionPhase='none';phase='complete';
+  removeReturnBeacon();
   if(document.pointerLockElement)document.exitPointerLock();
   var ms=getMs(),m=ms[mIdx];
   var elapsed=(performance.now()-mStartTime)/1000;
   var bonus=elapsed<30?Math.floor(m.reward*.5):0;
-  var pts=m.reward+bonus;
-  score+=pts;
+  var pts=m.reward+bonus;score+=pts;
 
-  var dotIdx=(stg-1)*4+mIdx;
-  document.getElementById('pd'+dotIdx).className='pd dn';
+  document.getElementById('pd'+(stg-1)*4+mIdx).className='pd dn';
   mIdx++;
-  if(mIdx<ms.length){
-    var ndot=(stg-1)*4+mIdx;
-    document.getElementById('pd'+ndot).className='pd ac';
-  }
+  if(mIdx<ms.length)document.getElementById('pd'+(stg-1)*4+mIdx).className='pd ac';
   document.getElementById('h-score').textContent=score;
   clearTargets();
 
-  var bonusTxt=bonus>0?' (Hiz bonusu: +'+bonus+')':'';
-  showGuide('GOREV TAMAMLANDI! +'+pts+' puan!'+bonusTxt,4000);
+  var bonusT=bonus>0?' (Hiz bonusu +'+bonus+')':'';
+  showGuide(m.doneText+' +'+pts+' puan!'+bonusT,4000);
 
-  if(mIdx>=ms.length){
-    setTimeout(stageComplete,2000);
-  } else {
+  if(mIdx>=ms.length){setTimeout(stageComplete,2500);}
+  else{
     setTimeout(function(){
       var p=document.getElementById('mission-panel');
       document.getElementById('mp-t').textContent='GOREV TAMAMLANDI!';
-      document.getElementById('mp-d').textContent='+'+pts+' puan kazandin!'+bonusTxt;
-      document.getElementById('mp-p').innerHTML='Toplam puan: '+score;
+      document.getElementById('mp-d').textContent=m.doneText;
+      document.getElementById('pr-data').innerHTML='<div class="pr-row"><span>Kazanilan Puan</span><span class="pr-val">+'+pts+bonusT+'</span></div>';
+      document.getElementById('pr-layers').innerHTML='';
+      document.getElementById('pr-summary').innerHTML='<div class="pr-row"><span>Toplam Puan</span><span class="pr-val">'+score+'</span></div>';
       document.getElementById('mp-o').textContent='Sonraki gorev hazirlaniyor...';
       document.getElementById('mp-btn').textContent='\u25B6 SONRAKI GOREV';
       document.getElementById('mp-btn').onclick=function(){p.style.display='none';startNext();};
       p.style.display='block';
-    },1500);
+    },1800);
   }
 }
 
@@ -540,20 +840,19 @@ function stageComplete(){
   var p=document.getElementById('stage-complete');
   if(stg===1){
     document.getElementById('sc-t').textContent='ASAMA 1 TAMAMLANDI!';
-    document.getElementById('sc-d').textContent='Temel uydu koruma gorevlerini basariyla tamamladin. Gelismis gorevler aciliyor...';
+    document.getElementById('sc-d').textContent='Temel uydu koruma gorevlerini basariyla tamamladin!';
     document.getElementById('sc-s').textContent='Toplam Puan: '+score;
-    document.getElementById('sc-b').textContent='ASAMA 2\'YI AC';
+    document.getElementById('sc-b').textContent='ASAMA 2 AC';
     document.getElementById('sc-b').onclick=function(){
       p.style.display='none';stg=2;mIdx=0;
       document.getElementById('h-stg').textContent='2 / 2';
       document.getElementById('pb-l').textContent='ASAMA 2';
       document.getElementById('pd4').className='pd ac';
-      player.position.set(0,0,0);
-      startNext();
+      player.position.set(0,0,0);startNext();
     };
   } else {
     document.getElementById('sc-t').textContent='TUM GOREVLER TAMAMLANDI!';
-    document.getElementById('sc-d').textContent='Kozmik veri muhafizi olarak tum gorevleri basariyla tamamladin!';
+    document.getElementById('sc-d').textContent='Kozmik veri muhafizi olarak tum gorevleri tamamladin!';
     document.getElementById('sc-s').textContent='Final Puani: '+score;
     document.getElementById('sc-b').textContent='BASTAN BASLA';
     document.getElementById('sc-b').onclick=function(){
@@ -563,63 +862,78 @@ function stageComplete(){
       document.getElementById('h-stg').textContent='1 / 2';
       document.getElementById('h-score').textContent='0';
       document.getElementById('pb-l').textContent='ASAMA 1';
-      player.position.set(0,0,0);
-      startNext();
+      player.position.set(0,0,0);startNext();
     };
   }
   p.style.display='block';
 }
 
-/* ═══════════════════════════════════════════════════════
+/* =============================================================
+   AUDIO (simple Web Audio pings)
+   ============================================================= */
+var audioCtx=null;
+function playPing(freq,dur){
+  try{
+    if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    var osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.frequency.value=freq;osc.type='sine';
+    gain.gain.setValueAtTime(0.15,audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+    osc.start();osc.stop(audioCtx.currentTime+dur);
+  }catch(e){}
+}
+
+/* =============================================================
    ANIMATION
-   ═══════════════════════════════════════════════════════ */
+   ============================================================= */
 var clock=new THREE.Clock();
 var camOff=new THREE.Vector3(0,6,8);
 
 function animate(){
   requestAnimationFrame(animate);
-  var dt=clock.getDelta();
+  var dt=Math.min(clock.getDelta(),0.05);
   var t=clock.getElapsedTime();
 
-  // Player movement
+  // Movement
   pMoving=false;
   if(mActive){
-    var spd=8*dt;
+    var spd=(shiftDown?12:8)*dt;
     var dir=new THREE.Vector3();
-    if(keys['w'])dir.z-=1;
-    if(keys['s'])dir.z+=1;
-    if(keys['a'])dir.x-=1;
-    if(keys['d'])dir.x+=1;
+    if(keys['w'])dir.z-=1;if(keys['s'])dir.z+=1;if(keys['a'])dir.x-=1;if(keys['d'])dir.x+=1;
     if(dir.length()>0){
       dir.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),pAngle);
-      player.position.add(dir.multiplyScalar(spd));
-      player.rotation.y=pAngle;
-      pMoving=true;
+      player.position.add(dir.multiplyScalar(spd));player.rotation.y=pAngle;pMoving=true;
     }
-    var bnd=19;
+    var bnd=20;
     player.position.x=Math.max(-bnd,Math.min(bnd,player.position.x));
     player.position.z=Math.max(-bnd,Math.min(bnd,player.position.z));
-
-    // Mission timer
     document.getElementById('h-time').textContent=((performance.now()-mStartTime)/1000).toFixed(0)+'s';
   }
 
-  // Walk animation
+  // Jump
+  if(isJumping){
+    player.position.y+=pVelY*dt;pVelY-=15*dt;
+    if(player.position.y<=0){player.position.y=0;pVelY=0;isJumping=false;}
+  }
+
+  // Walk anim
   if(pMoving){
-    var swing=Math.sin(t*10)*0.5;
-    pLegL.rotation.x=swing;pLegR.rotation.x=-swing;
-    pArmL.rotation.x=-swing*.7;pArmR.rotation.x=swing*.7;
+    var sw=Math.sin(t*(shiftDown?14:10))*0.55;
+    pLegL.rotation.x=sw;pLegR.rotation.x=-sw;pArmL.rotation.x=-sw*.6;pArmR.rotation.x=sw*.6;
   } else {
-    pLegL.rotation.x*=0.9;pLegR.rotation.x*=0.9;
-    pArmL.rotation.x*=0.9;pArmR.rotation.x*=0.9;
+    pLegL.rotation.x*=.9;pLegR.rotation.x*=.9;pArmL.rotation.x*=.9;pArmR.rotation.x*=.9;
+    // Idle breathing
+    var breath=1+Math.sin(t*2)*.015;
+    pBody.scale.y=breath;
   }
 
   // Camera
-  var ct=player.position.clone().add(camOff.clone().applyAxisAngle(new THREE.Vector3(0,1,0),pAngle));
-  cam.position.lerp(ct,4*dt);
+  var ct2=player.position.clone().add(camOff.clone().applyAxisAngle(new THREE.Vector3(0,1,0),pAngle));
+  cam.position.lerp(ct2,4*dt);
   cam.lookAt(player.position.x,player.position.y+2,player.position.z);
 
-  // Target animation + proximity check
+  // Target anim + proximity
   nearTarget=false;
   targets.forEach(function(tg){
     if(!tg.userData.collected&&tg.visible){
@@ -628,42 +942,56 @@ function animate(){
       if(mActive&&player.position.distanceTo(tg.position)<2.5)nearTarget=true;
     }
   });
+
+  // Return beacon anim
+  if(returnBeacon){
+    returnBeacon.position.y=.9+Math.sin(t*3)*.3;
+    returnBeacon.rotation.y=t*1.5;
+    if(mActive&&player.position.distanceTo(returnBeacon.position)<3)nearTarget=true;
+  }
+
   document.getElementById('interact-hint').style.display=nearTarget?'block':'none';
 
-  // Particles: rain
+  // Particles
   particles.forEach(function(p){
-    if(p.userData.rain){
-      p.position.y-=p.userData.vy*dt;
-      if(p.position.y<0)p.position.y=6;
-    }
-    if(p.userData.smoke){
-      p.position.y+=p.userData.vy*dt;
-      if(p.position.y>5){p.position.y=0.5;p.position.x+=(Math.random()-.5)*2;p.position.z+=(Math.random()-.5)*2;}
+    if(p.userData.rain){p.position.y-=p.userData.vy*dt;if(p.position.y<0)p.position.y=7;}
+    if(p.userData.fire){p.position.y+=p.userData.vy*dt;if(p.position.y>4){p.position.y=.3;p.position.x+=(Math.random()-.5)*2;p.position.z+=(Math.random()-.5)*2;}}
+    if(p.userData.smoke){p.position.y+=p.userData.vy*dt;if(p.position.y>5){p.position.y=.5;p.position.x+=(Math.random()-.5)*2;p.position.z+=(Math.random()-.5)*2;}}
+    if(p.userData.dataFlow){p.position.y+=p.userData.vy*dt;if(p.position.y>3.5)p.position.y=0;}
+    if(p.userData.holo){
+      p.userData.angle+=dt*1.5;
+      p.position.x=Math.cos(p.userData.angle)*p.userData.radius;
+      p.position.z=Math.sin(p.userData.angle)*p.userData.radius;
+      p.position.y=4+Math.sin(t*3+p.userData.angle)*.3;
     }
   });
 
-  // Blinking lights
-  mapObjs.forEach(function(o){
-    if(o.userData&&o.userData.blink&&o.material){
-      o.material.opacity=.5+Math.sin(t*4)*.5;o.material.transparent=true;
-    }
-    if(o.userData&&o.userData.spin){o.rotation.z=t*2;}
+  // Map object anims
+  mapO.forEach(function(o){
+    if(!o.userData)return;
+    if(o.userData.blink&&o.material){o.material.opacity=.4+Math.sin(t*4)*.6;o.material.transparent=true;}
+    if(o.userData.spin){o.rotation.z=t*2.5;}
+    if(o.userData.spinSlow){o.rotation.y=t*.3;}
+    if(o.userData.serverGlow&&o.material){o.material.opacity=.15+Math.sin(t*3+o.position.x)*.12;}
   });
 
-  // Glow on player
-  sunL.target=player;
+  starMesh.rotation.y+=dt*.003;
+
+  // Update compass + minimap
+  updateCompass();
+  if(Math.floor(t*5)%2===0)drawMinimap();
 
   ren.render(sc,cam);
 }
 animate();
 
-window.addEventListener('resize',function(){
-  cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);
-});
+window.addEventListener('resize',function(){cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);});
 
 /* API */
 window.cosmicUpdate=function(data){
-  pResult={faults:data.faults_detected||0,corrected:data.faults_corrected||0,time:data.processing_time||0};
+  pResult={dataPoints:data.data_points||2000,faults:data.faults_detected||0,corrected:data.faults_corrected||0,
+    l1:data.l1||0,l2:data.l2||0,l3:data.l3||0,l4:data.l4||0,
+    time:data.processing_time||0,confidence:data.confidence||80};
 };
 
 /* START */
