@@ -85,6 +85,10 @@ def run_pipeline(
 
     config = _deep_merge(DEFAULT_CONFIG, config or {})
 
+    from config.config import validate_config
+    for w in validate_config(config):
+        logger.warning("Config warning: %s", w)
+
     t_start = time.perf_counter()
     tracer = PipelineTracer()
 

@@ -49,3 +49,18 @@ def test_pipeline_uses_merged_config():
     result = run_pipeline(df, config={"ensemble": {"min_agreement": 3}}, method="classic")
     assert "cleaned_data" in result
     assert "fault_mask" in result
+
+
+def test_config_validation_warnings():
+    """Extreme values produce warnings."""
+    from config.config import validate_config
+    w = validate_config({"dsp_detector": {"zscore_threshold": 0.5}})
+    assert any("hassas" in x for x in w)
+
+
+def test_config_validation_no_warnings():
+    """Default config produces no warnings."""
+    from config.config import validate_config
+    from pipeline.orchestrator import DEFAULT_CONFIG
+    w = validate_config(DEFAULT_CONFIG)
+    assert len(w) == 0

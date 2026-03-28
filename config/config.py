@@ -69,3 +69,31 @@ class PipelineConfig:
                 if k in FilterConfig.__dataclass_fields__
             }),
         )
+
+
+def validate_config(config: dict) -> list[str]:
+    """Validate pipeline config dict and return warnings for risky values."""
+    warnings = []
+    dsp = config.get("dsp_detector", {})
+    ens = config.get("ensemble", {})
+    flt = config.get("classic_filter", {})
+
+    zt = dsp.get("zscore_threshold", 2.0)
+    if zt < 1.0:
+        warnings.append("zscore_threshold < 1.0: cok hassas, false positive artabilir")
+    if zt > 5.0:
+        warnings.append("zscore_threshold > 5.0: cok genis, anomaliler kacirilabilir")
+
+    ma = ens.get("min_agreement", 2)
+    if ma < 1:
+        warnings.append("min_agreement < 1: tum soft dedektorler gecerli olur")
+    if ma > 4:
+        warnings.append("min_agreement > 4: hic anomali bulunamaz")
+
+    mw = flt.get("median_window", 5)
+    if mw < 3:
+        warnings.append("median_window < 3: etkin filtreleme yapamaz")
+    if mw > 51:
+        warnings.append("median_window > 51: sinyal detayini kaybedebilir")
+
+    return warnings
