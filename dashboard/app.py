@@ -1,167 +1,72 @@
-"""Streamlit dashboard for the Cosmic Pipeline — visualize, compare, export."""
+"""Gradio dashboard for the Cosmic Signal Processing Pipeline."""
 
+import base64
 import logging
 import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import gradio as gr
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import streamlit as st
 
-# Ensure project root is on the path so pipeline imports work
-PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-from dashboard.charts import (
-    plot_anomaly_timeline,
-    plot_comparison,
-    plot_metrics_bar,
-    plot_signal,
-)
-from data.synthetic_generator import FaultConfig, generate_corrupted_dataset
+from data.synthetic_generator import FaultConfig, generate_corrupted_dataset, generate_clean_signal
 from pipeline.orchestrator import run_pipeline
-from pipeline.validator import calculate_metrics
 
-# ---------------------------------------------------------------------------
-# Page config & dark theme CSS
-# ---------------------------------------------------------------------------
-st.set_page_config(
-    page_title="Cosmic Pipeline",
-    page_icon="🛰️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+logging.basicConfig(level=logging.INFO)
 
-_CSS = """
-<style>
-    /* dark background */
-    .stApp { background-color: #020408; }
-    header[data-testid="stHeader"] { background-color: #020408; }
-    section[data-testid="stSidebar"] > div { background-color: #060b12; }
+# ── Log capture ────────────────────────────────────────────────────────────────
 
-    /* metric cards */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #0a1628 0%, #0d1f3c 100%);
-        border: 1px solid rgba(0,212,255,0.15);
-        border-radius: 12px;
-        padding: 16px 20px;
-    }
-    div[data-testid="stMetric"] label { color: #8ab4f8 !important; }
-    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #00d4ff !important; }
-
-    /* tab labels */
-    button[data-baseweb="tab"] { color: #8ab4f8 !important; }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #00d4ff !important;
-        border-bottom-color: #00d4ff !important;
-    }
-</style>
-"""
-st.markdown(_CSS, unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-def _precision_recall(detected: np.ndarray, truth: np.ndarray):
-    tp = np.sum(detected & truth)
-    fp = np.sum(detected & ~truth)
-    fn = np.sum(~detected & truth)
-    prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
-    return float(prec), float(rec), float(f1)
-
-
-def _gt_bool_mask(gt: dict, n: int) -> np.ndarray:
-    mask = np.zeros(n, dtype=bool)
-    for i in gt.get("seu", []):
-        if 0 <= i < n:
-            mask[i] = True
-    for s, e in gt.get("gap", []):
-        mask[s:min(e, n)] = True
-    for i in gt.get("noise", []):
-        if 0 <= i < n:
-            mask[i] = True
-    tid = gt.get("tid", [])
-    if tid:
-        mask[int(n * 0.4):] = True
-    return mask
-
-
-@st.cache_data(show_spinner=False)
-def _generate(n: int, seed: int, seu: int, tid: float, gaps: int, noise: float):
-    cfg = FaultConfig(
-        seu_count=seu, tid_slope=tid, gap_count=gaps, noise_std_max=noise,
-    )
-    return generate_corrupted_dataset(n=n, config=cfg, seed=seed)
-
-
-@st.cache_data(show_spinner=False)
-def _run(corrupted_df: pd.DataFrame, method: str):
-    """Run pipeline on the corrupted DataFrame."""
-    return run_pipeline(corrupted_df.copy(), method=method)
-
-
-# ---------------------------------------------------------------------------
-# Pipeline log capture
-# ---------------------------------------------------------------------------
 _PIPELINE_LOGGERS = [
-    "pipeline.orchestrator",
-    "pipeline.detector_classic",
-    "pipeline.detector_ml",
-    "pipeline.ensemble",
-    "pipeline.filters_classic",
-    "pipeline.filters_ml",
-    "pipeline.validator",
-    "pipeline.ingestion",
+    "pipeline.orchestrator", "pipeline.detector_classic", "pipeline.detector_ml",
+    "pipeline.ensemble", "pipeline.filters_classic", "pipeline.filters_ml",
+    "pipeline.validator", "pipeline.ingestion",
 ]
 
 
-class _DashboardLogHandler(logging.Handler):
-    """Captures pipeline log records with elapsed timestamps."""
-
+class _LogCapture(logging.Handler):
     def __init__(self):
         super().__init__()
         self.logs: list[str] = []
-        self.start_time: float | None = None
+        self.t0: float | None = None
 
     def emit(self, record: logging.LogRecord) -> None:
-        if self.start_time is None:
-            self.start_time = time.time()
-        elapsed = time.time() - self.start_time
-        msg = self.format(record)
-        self.logs.append(f"[{elapsed:07.3f}] {msg}")
+        if self.t0 is None:
+            self.t0 = time.time()
+        elapsed = time.time() - self.t0
+        self.logs.append(f"[{elapsed:07.3f}] {self.format(record)}")
 
 
-def _run_with_logs(corrupted_df: pd.DataFrame, method: str) -> tuple[dict, list[str]]:
-    """Run pipeline and return (result_dict, log_lines)."""
-    handler = _DashboardLogHandler()
+def _run_with_logs(df: pd.DataFrame, method: str) -> tuple[dict, list[str]]:
+    handler = _LogCapture()
     handler.setLevel(logging.INFO)
-    handler.start_time = time.time()
-
+    handler.t0 = time.time()
     for name in _PIPELINE_LOGGERS:
         logging.getLogger(name).addHandler(handler)
         logging.getLogger(name).setLevel(logging.INFO)
-
     try:
-        result = run_pipeline(corrupted_df.copy(), method=method)
+        result = run_pipeline(df.copy(), method=method)
     finally:
         for name in _PIPELINE_LOGGERS:
             logging.getLogger(name).removeHandler(handler)
-
     return result, handler.logs
 
 
+# ── Plot helpers ───────────────────────────────────────────────────────────────
+
+_TEMPLATE = "plotly_dark"
+_BG = "rgba(0,0,0,0)"
+_GRID = "rgba(10,14,23,0.8)"
+
+
 def _plot_clean_vs_corrupted(clean_df, corrupted_df):
-    """Two-row subplot: clean signal on top, corrupted on bottom."""
     fig = make_subplots(
         rows=2, cols=1, shared_xaxes=True,
-        subplot_titles=["Temiz Sinyal (Ground Truth)", "Radyasyonla Bozulmuş Sinyal"],
+        subplot_titles=["Temiz Sinyal (Ground Truth)", "Radyasyonla Bozulmus Sinyal"],
         vertical_spacing=0.10,
     )
     fig.add_trace(go.Scatter(
@@ -173,11 +78,8 @@ def _plot_clean_vs_corrupted(clean_df, corrupted_df):
         mode="lines", name="Bozuk", line=dict(color="#f59e0b", width=1),
     ), row=2, col=1)
     fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,14,23,0.8)",
-        height=480,
-        showlegend=True,
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_GRID,
+        height=450, showlegend=True,
         legend=dict(orientation="h", y=-0.08),
         margin=dict(t=40, b=50, l=60, r=30),
     )
@@ -185,7 +87,6 @@ def _plot_clean_vs_corrupted(clean_df, corrupted_df):
 
 
 def _plot_triple_overlay(clean_df, corrupted_df, cleaned_df, fault_mask=None):
-    """Three signals overlaid: ground truth, corrupted, cleaned."""
     fig = go.Figure()
     if clean_df is not None:
         fig.add_trace(go.Scatter(
@@ -200,7 +101,7 @@ def _plot_triple_overlay(clean_df, corrupted_df, cleaned_df, fault_mask=None):
     ))
     fig.add_trace(go.Scatter(
         x=cleaned_df["timestamp"], y=cleaned_df["value"],
-        mode="lines", name="Temizlenmiş",
+        mode="lines", name="Temizlenmis",
         line=dict(color="#00d4ff", width=2),
     ))
     if fault_mask is not None:
@@ -214,462 +115,391 @@ def _plot_triple_overlay(clean_df, corrupted_df, cleaned_df, fault_mask=None):
                 marker=dict(color="#ff4444", size=3, symbol="x", opacity=0.6),
             ))
     fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,14,23,0.8)",
-        title="Ground Truth vs Bozuk vs Temizlenmiş Sinyal",
-        height=420,
-        showlegend=True,
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_GRID,
+        height=400, showlegend=True,
         legend=dict(orientation="h", y=-0.12),
-        margin=dict(t=50, b=60, l=60, r=30),
+        margin=dict(t=40, b=60, l=60, r=30),
     )
     return fig
 
 
-# ---------------------------------------------------------------------------
-# Sidebar — data source & parameters
-# ---------------------------------------------------------------------------
-with st.sidebar:
-    st.markdown("## 🛰️ Cosmic Pipeline")
-    st.caption("Radiation-corrupted telemetry cleaner")
-    st.markdown("---")
-
-    source = st.radio("Data source", ["Synthetic generator", "Upload CSV"], horizontal=True)
-
-    if source == "Upload CSV":
-        uploaded = st.file_uploader("CSV (timestamp, value)", type=["csv"])
-        if uploaded is not None:
-            import base64 as _b64
-            from utils.csv_parser import parse_uploaded_csv
-
-            raw_bytes = uploaded.getvalue()
-            encoded = _b64.b64encode(raw_bytes).decode()
-            contents = f"data:text/csv;base64,{encoded}"
-
-            user_df, csv_error = parse_uploaded_csv(contents, uploaded.name)
-            if csv_error is not None:
-                st.error(f"❌ {csv_error}")
-                st.stop()
-
-            st.success(f"✅ {len(user_df)} satır yüklendi ({uploaded.name})")
-            clean_df = None
-            corrupted_df = user_df
-            gt_mask = None
-        else:
-            st.info("Upload a CSV to begin.")
-            st.stop()
-    else:
-        st.markdown("### Signal parameters")
-        n_samples = st.slider("Samples", 1000, 50000, 10000, step=1000)
-        seed = st.number_input("Seed", value=42, step=1)
-
-        st.markdown("### Fault injection")
-        seu_count = st.slider("SEU count", 0, 50, 15)
-        tid_slope = st.slider("TID drift slope", 0.0, 0.01, 0.003, step=0.001, format="%.3f")
-        gap_count = st.slider("Gap blocks", 0, 10, 4)
-        noise_max = st.slider("Noise std max", 0.0, 5.0, 2.0, step=0.1)
-
-        clean_df, corrupted_df, gt_mask = _generate(
-            n_samples, seed, seu_count, tid_slope, gap_count, noise_max,
-        )
-
-    st.markdown("---")
-    methods_to_run = st.multiselect(
-        "Methods to run",
-        ["classic", "ml", "both"],
-        default=["classic", "ml"],
+def _plot_detector_breakdown(detector_masks, corrupted_df):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=corrupted_df["timestamp"], y=corrupted_df["value"],
+        mode="lines", name="Sinyal",
+        line=dict(color="#8bb8d4", width=1), opacity=0.5,
+    ))
+    colors = {
+        "zscore": "#3b82f6", "sliding_window": "#8b5cf6", "gaps": "#ef4444",
+        "range": "#f97316", "delta": "#eab308", "flatline": "#06b6d4",
+        "duplicates": "#ec4899", "isolation_forest": "#22c55e", "lstm_ae": "#00d4ff",
+    }
+    for name, mask in detector_masks.items():
+        if mask.any():
+            idx = np.where(mask.values)[0]
+            fig.add_trace(go.Scatter(
+                x=corrupted_df["timestamp"].iloc[idx],
+                y=corrupted_df["value"].iloc[idx],
+                mode="markers", name=f"{name} ({int(mask.sum())})",
+                marker=dict(color=colors.get(name, "#ffffff"), size=4),
+            ))
+    fig.update_layout(
+        template=_TEMPLATE, paper_bgcolor=_BG, plot_bgcolor=_GRID,
+        height=400, showlegend=True,
+        legend=dict(orientation="h", y=-0.15),
+        margin=dict(t=30, b=70, l=60, r=30),
     )
+    return fig
 
-    run_btn = st.button("Run Pipeline", type="primary", use_container_width=True)
 
-# ---------------------------------------------------------------------------
-# Main area
-# ---------------------------------------------------------------------------
-st.markdown("# 🛰️ Cosmic Pipeline Dashboard")
+# ── Log formatter ──────────────────────────────────────────────────────────────
 
-if not run_btn and "results" not in st.session_state:
-    # Show raw data preview while waiting for the user to click Run
-    st.info("Configure parameters in the sidebar and click **Run Pipeline**.")
-
-    st.markdown("### 📡 Veri Önizleme")
-    col_left, col_right = st.columns(2)
-
-    with col_left:
-        st.markdown("#### ☢️ Radyasyonlu Veri")
-        if corrupted_df is not None:
-            disp = corrupted_df[["timestamp", "value"]].head(50).copy()
-            disp.index = range(1, len(disp) + 1)
-            disp.index.name = "#"
-            st.dataframe(disp, use_container_width=True, height=400)
-            nan_n = int(corrupted_df["value"].isna().sum())
-            vmin = corrupted_df["value"].min()
-            vmax = corrupted_df["value"].max()
-            st.caption(
-                f"Toplam: {len(corrupted_df)} satır | NaN: {nan_n} "
-                f"| Min: {vmin:.2f} | Max: {vmax:.2f}"
-            )
-
-    with col_right:
-        st.markdown("#### ✅ Temiz Veri (Ground Truth)")
-        if clean_df is not None:
-            preview_cols = ["timestamp", "value"]
-            for extra in ["orbit_id", "phase", "sensor_id"]:
-                if extra in clean_df.columns:
-                    preview_cols.append(extra)
-            disp_c = clean_df[preview_cols].head(50).copy()
-            disp_c.index = range(1, len(disp_c) + 1)
-            disp_c.index.name = "#"
-            st.dataframe(disp_c, use_container_width=True, height=400)
-            st.caption(
-                f"Toplam: {len(clean_df)} satır "
-                f"| Min: {clean_df['value'].min():.2f} "
-                f"| Max: {clean_df['value'].max():.2f}"
-            )
-        else:
-            st.info("CSV yüklendi — ground truth mevcut değil")
-
-    if clean_df is not None and corrupted_df is not None:
-        st.plotly_chart(
-            _plot_clean_vs_corrupted(clean_df, corrupted_df),
-            use_container_width=True,
-        )
-    st.stop()
-
-# --- Execute pipeline -------------------------------------------------------
-if run_btn:
-    results: dict = {}
-    all_logs: dict[str, list[str]] = {}
-    progress = st.progress(0, text="Starting pipeline...")
-    for i, method in enumerate(methods_to_run):
-        progress.progress(
-            int((i / len(methods_to_run)) * 100),
-            text=f"Running **{method}** ...",
-        )
-        t0 = time.perf_counter()
-        try:
-            res, logs = _run_with_logs(corrupted_df, method)
-            res["elapsed"] = time.perf_counter() - t0
-            res["error"] = None
-            results[method] = res
-            all_logs[method] = logs
-        except Exception as exc:
-            results[method] = {"error": str(exc), "elapsed": time.perf_counter() - t0}
-            all_logs[method] = [f"[ERROR] {exc}"]
-
-    progress.progress(100, text="Done!")
-    st.session_state["results"] = results
-    st.session_state["all_logs"] = all_logs
-    st.session_state["corrupted_df"] = corrupted_df
-    st.session_state["clean_df"] = clean_df
-    st.session_state["gt_mask"] = gt_mask
-
-# Retrieve stored results
-results = st.session_state.get("results", {})
-all_logs = st.session_state.get("all_logs", {})
-corrupted_df = st.session_state.get("corrupted_df", corrupted_df)
-clean_df = st.session_state.get("clean_df", clean_df)
-gt_mask = st.session_state.get("gt_mask", gt_mask)
-
-if not results:
-    st.stop()
-
-# --- 1. Data tables (side by side) ------------------------------------------
-st.markdown("### 📡 Veri Önizleme")
-col_left, col_right = st.columns(2)
-
-with col_left:
-    st.markdown("#### ☢️ Radyasyonlu Veri")
-    if corrupted_df is not None:
-        disp = corrupted_df[["timestamp", "value"]].head(50).copy()
-        disp.index = range(1, len(disp) + 1)
-        disp.index.name = "#"
-        st.dataframe(disp, use_container_width=True, height=400)
-        nan_n = int(corrupted_df["value"].isna().sum())
-        vmin = corrupted_df["value"].min()
-        vmax = corrupted_df["value"].max()
-        st.caption(
-            f"Toplam: {len(corrupted_df)} satır | NaN: {nan_n} "
-            f"| Min: {vmin:.2f} | Max: {vmax:.2f}"
-        )
-
-with col_right:
-    st.markdown("#### ✅ Temiz Veri (Ground Truth)")
-    if clean_df is not None:
-        display_cols = ["timestamp", "value"]
-        for extra in ["orbit_id", "phase", "sensor_id"]:
-            if extra in clean_df.columns:
-                display_cols.append(extra)
-        disp_c = clean_df[display_cols].head(50).copy()
-        disp_c.index = range(1, len(disp_c) + 1)
-        disp_c.index.name = "#"
-        st.dataframe(disp_c, use_container_width=True, height=400)
-        st.caption(
-            f"Toplam: {len(clean_df)} satır "
-            f"| Min: {clean_df['value'].min():.2f} "
-            f"| Max: {clean_df['value'].max():.2f}"
-        )
-    else:
-        st.info("CSV yüklendi — ground truth mevcut değil")
-
-if clean_df is not None:
-    st.plotly_chart(
-        _plot_clean_vs_corrupted(clean_df, corrupted_df),
-        use_container_width=True,
-    )
-
-# --- 2. Pipeline log (user-friendly report) --------------------------------
-
-def _format_user_friendly_log(logs, method, result=None):
-    """Parse pipeline logs into a user-friendly Turkish summary."""
+def _format_pipeline_log(logs, method, result=None):
     lines = []
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    lines.append(f"🛰️  Pipeline Calistirildi — Yontem: {method.upper()}")
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    lines.append("=" * 45)
+    lines.append(f"  Pipeline -- Yontem: {method.upper()}")
+    lines.append("=" * 45)
     lines.append("")
 
-    st_ = {"zscore": 0, "sliding_window": 0, "gaps": 0, "range": 0,
-            "delta": 0, "flatline": 0, "duplicates": 0,
-            "isolation_forest": 0, "lstm_ae": 0}
+    st = {
+        "zscore": 0, "sliding_window": 0, "gaps": 0, "range": 0,
+        "delta": 0, "flatline": 0, "duplicates": 0,
+        "isolation_forest": 0, "lstm_ae": 0,
+    }
+    kw_map = {
+        "zscore": "Z-score", "sliding_window": "Sliding window",
+        "gaps": "Gap detection", "range": "Range violation",
+        "delta": "Delta spike", "flatline": "Flatline",
+        "duplicates": "Duplicate", "isolation_forest": "Isolation",
+        "lstm_ae": "LSTM",
+    }
     for line in logs:
-        for key in st_:
-            kw_map = {"zscore": "Z-score", "sliding_window": "Sliding window",
-                      "gaps": "Gap detection", "range": "Range violation",
-                      "delta": "Delta spike", "flatline": "Flatline",
-                      "duplicates": "Duplicate", "isolation_forest": "Isolation",
-                      "lstm_ae": "LSTM"}
-            kw = kw_map.get(key, key)
+        for key, kw in kw_map.items():
             if kw in line and "detected" in line:
-                try:
-                    for part in line.split():
-                        if part.isdigit():
-                            st_[key] = int(part)
-                            break
-                except Exception:
-                    pass
+                for part in line.split():
+                    if part.isdigit():
+                        st[key] = int(part)
+                        break
 
-    lines.append("📥 ADIM 1 — Veri Alimi")
-    lines.append("   Veri basariyla yuklendi ve on isleme tamamlandi.")
+    lines.append("ADIM 1 -- Veri Alimi")
+    lines.append("   Veri yuklendi ve on isleme tamamlandi.")
     lines.append("")
-    lines.append("📉 ADIM 2 — On Isleme")
-    lines.append("   Lineer trend (TID drift) tespit edildi ve kaldirildi.")
+    lines.append("ADIM 2 -- On Isleme")
+    lines.append("   Lineer trend (TID drift) kaldirildi.")
     lines.append("")
-    lines.append("🔍 ADIM 3 — Anomali Tespiti")
-    lines.append("   ┌─────────────────────────────────────────┐")
-    lines.append("   │ KATMAN 1 — Deterministik Kurallar       │")
-    lines.append(f"   │   🕳️  Veri bosluklari (gap):     {st_['gaps']:>5}  │")
-    lines.append(f"   │   🚫  Fiziksel limit ihlali:     {st_['range']:>5}  │")
-    lines.append(f"   │   ⚡  Ani sicrama (delta):       {st_['delta']:>5}  │")
-    lines.append(f"   │   📏  Sabit sinyal (flatline):   {st_['flatline']:>5}  │")
-    lines.append(f"   │   🔁  Tekrar eden zaman:         {st_['duplicates']:>5}  │")
-    lines.append("   ├─────────────────────────────────────────┤")
-    lines.append("   │ KATMAN 2 — Istatistiksel Analiz         │")
-    lines.append(f"   │   📊  Z-score sapmasi:           {st_['zscore']:>5}  │")
-    lines.append(f"   │   📐  Kayan pencere sapmasi:     {st_['sliding_window']:>5}  │")
-    lines.append("   ├─────────────────────────────────────────┤")
-    lines.append("   │ KATMAN 3 — Makine Ogrenimi              │")
-    lines.append(f"   │   🌲  Isolation Forest:          {st_['isolation_forest']:>5}  │")
-    lines.append("   ├─────────────────────────────────────────┤")
-    lines.append("   │ KATMAN 4 — Derin Ogrenme                │")
-    lines.append(f"   │   🧠  LSTM Autoencoder:          {st_['lstm_ae']:>5}  │")
-    lines.append("   └─────────────────────────────────────────┘")
+    lines.append("ADIM 3 -- Anomali Tespiti")
+    lines.append("   +---------------------------------------------+")
+    lines.append("   | KATMAN 1 -- Deterministik Kurallar           |")
+    lines.append(f"   |   Veri bosluklari (gap):          {st['gaps']:>5}     |")
+    lines.append(f"   |   Fiziksel limit ihlali:          {st['range']:>5}     |")
+    lines.append(f"   |   Ani sicrama (delta):            {st['delta']:>5}     |")
+    lines.append(f"   |   Sabit sinyal (flatline):        {st['flatline']:>5}     |")
+    lines.append(f"   |   Tekrar eden zaman:              {st['duplicates']:>5}     |")
+    lines.append("   |---------------------------------------------|")
+    lines.append("   | KATMAN 2 -- Istatistiksel Analiz             |")
+    lines.append(f"   |   Z-score sapmasi:                {st['zscore']:>5}     |")
+    lines.append(f"   |   Kayan pencere sapmasi:          {st['sliding_window']:>5}     |")
+    lines.append("   |---------------------------------------------|")
+    lines.append("   | KATMAN 3 -- Makine Ogrenimi                  |")
+    lines.append(f"   |   Isolation Forest:               {st['isolation_forest']:>5}     |")
+    lines.append("   |---------------------------------------------|")
+    lines.append("   | KATMAN 4 -- Derin Ogrenme                    |")
+    lines.append(f"   |   LSTM Autoencoder:               {st['lstm_ae']:>5}     |")
+    lines.append("   +---------------------------------------------+")
     lines.append("")
-    lines.append("🗳️  ADIM 4 — Karar (Hybrid Majority Ensemble)")
-    lines.append("   Deterministik kurallar → otomatik anomali")
-    lines.append("   Istatistik + ML → en az 2 detektor anlasirsa anomali")
+    lines.append("ADIM 4 -- Karar (Hybrid Majority Ensemble)")
+    lines.append("   Hard rules -> otomatik anomali")
+    lines.append("   Soft detectors -> en az 2 anlasma gerekli")
     if result:
         total = result.get("metrics", {}).get("faults_detected", 0)
-        lines.append(f"   Toplam tespit edilen anomali: {total}")
+        lines.append(f"   Toplam anomali: {total}")
     lines.append("")
-    lines.append("🧹 ADIM 5 — Temizleme (Mercek Modeli)")
-    lines.append("   1️⃣  Interpolation → bosluklar dolduruldu")
-    lines.append("   2️⃣  Detrend → lineer kayma kaldirildi")
-    lines.append("   3️⃣  Median filtre → spike'lar temizlendi")
+    lines.append("ADIM 5 -- Temizleme (Mercek Modeli)")
+    lines.append("   1. Interpolation -> bosluklar dolduruldu")
+    lines.append("   2. Detrend -> lineer kayma kaldirildi")
+    lines.append("   3. Median filtre -> spike'lar temizlendi")
     lines.append("")
-    lines.append("✅ ADIM 6 — Dogrulama")
-    lines.append("   Temizlenmis sinyal kontrol edildi: NaN=0, Inf=0")
+    lines.append("ADIM 6 -- Dogrulama")
     if result:
-        elapsed = result.get("elapsed", result.get("metrics", {}).get("processing_time", 0))
-        lines.append(f"   Islem suresi: {elapsed:.3f} saniye")
-    lines.append("")
-    lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    ft = result.get("fault_timeline") if result else None
-    if ft is not None and "repair_decision" in ft.columns:
-        repair_n = int((ft["repair_decision"] == "repair").sum())
-        flag_n = int((ft["repair_decision"] == "flag_only").sum())
-        preserve_n = int((ft["repair_decision"] == "preserve").sum())
-        lines.append("🔧 Onarim Karari:")
-        lines.append(f"   ✅ Duzeltildi:  {repair_n}")
-        lines.append(f"   ⚠️  Sadece isaretlendi:  {flag_n}")
-        lines.append(f"   🛡️  Korundu (gercek event olabilir):  {preserve_n}")
-        lines.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        rv = result.get("repair_verification", {})
+        status = "BASARILI" if rv.get("passed", True) else "SORUN VAR"
+        elapsed = result.get("metrics", {}).get("processing_time", 0)
+        lines.append(f"   Durum: {status} | Sure: {elapsed:.3f}s")
+
+        ft = result.get("fault_timeline")
+        if ft is not None and "repair_decision" in ft.columns:
+            repair_n = int((ft["repair_decision"] == "repair").sum())
+            flag_n = int((ft["repair_decision"] == "flag_only").sum())
+            preserve_n = int((ft["repair_decision"] == "preserve").sum())
+            lines.append("")
+            lines.append("Onarim Karari:")
+            lines.append(f"   Duzeltildi: {repair_n}")
+            lines.append(f"   Isaretlendi: {flag_n}")
+            lines.append(f"   Korundu: {preserve_n}")
+
+        rc = result.get("repair_confidence")
+        fm = result.get("fault_mask")
+        if rc is not None and fm is not None and fm.any():
+            mean_c = float(rc[fm].mean())
+            min_c = float(rc[fm].min())
+            lines.append(f"   Guven: ortalama={mean_c:.1%}, min={min_c:.1%}")
+
+        si = result.get("sampling_info", {})
+        if si:
+            lines.append(
+                f"   Ornekleme: {si.get('detected_interval', 0):.2f}s aralik, "
+                f"jitter={si.get('jitter_ratio', 0):.2%}"
+            )
+
+    lines.append("=" * 45)
     return "\n".join(lines)
 
 
-if all_logs:
-    st.markdown("### 📋 Pipeline Islem Raporu")
-    for method, logs in all_logs.items():
-        res = results.get(method)
-        formatted = _format_user_friendly_log(logs, method, res)
-        st.code(formatted, language="")
+# ── App state ──────────────────────────────────────────────────────────────────
 
-# --- 3. Triple overlay per method ------------------------------------------
-valid_results = {m: r for m, r in results.items() if r.get("error") is None}
-if valid_results:
-    st.markdown("### 📊 Sonuç: Ground Truth vs Bozuk vs Temizlenmiş")
-    for method, res in valid_results.items():
-        st.plotly_chart(
-            _plot_triple_overlay(
-                clean_df, corrupted_df, res["cleaned_data"], res["fault_mask"],
-            ),
-            use_container_width=True,
+_state: dict = {}
+
+
+# ── Callbacks ──────────────────────────────────────────────────────────────────
+
+def generate_data(n_samples, seed, seu_count, tid_slope, gap_count, noise_max):
+    try:
+        config = FaultConfig(
+            seu_count=int(seu_count), tid_slope=float(tid_slope),
+            gap_count=int(gap_count), noise_std_max=float(noise_max),
         )
+        clean, corrupted, mask = generate_corrupted_dataset(
+            n=int(n_samples), config=config, seed=int(seed),
+        )
+        _state["clean"] = clean
+        _state["corrupted"] = corrupted
+        _state["gt_mask"] = mask
 
-st.markdown("---")
+        fig = _plot_clean_vs_corrupted(clean, corrupted)
 
-# --- Tabs --------------------------------------------------------------------
-tab_overview, tab_compare, tab_timeline, tab_export = st.tabs(
-    ["Overview", "Comparison", "Timeline", "Export"],
+        display_cols = ["timestamp", "value"]
+        for c in ("orbit_id", "phase", "sensor_id"):
+            if c in clean.columns:
+                display_cols.append(c)
+        clean_table = clean[display_cols].head(50)
+        corrupted_table = corrupted[["timestamp", "value"]].head(50)
+
+        orbits = clean["orbit_id"].nunique() if "orbit_id" in clean.columns else "?"
+        info = (
+            f"OK — {int(n_samples)} satir uretildi | SEU: {int(seu_count)} | "
+            f"Gap: {int(gap_count)} | Orbits: {orbits}"
+        )
+        return fig, clean_table, corrupted_table, info
+    except Exception as e:
+        return None, None, None, f"HATA: {e}"
+
+
+def upload_csv(file):
+    if file is None:
+        return None, None, None, "Dosya secilmedi"
+    try:
+        from utils.csv_parser import parse_uploaded_csv
+
+        with open(file.name, "rb") as f:
+            raw = f.read()
+        encoded = base64.b64encode(raw).decode()
+        contents = f"data:text/csv;base64,{encoded}"
+        df, error = parse_uploaded_csv(contents, Path(file.name).name)
+        if error:
+            return None, None, None, f"HATA: {error}"
+
+        _state["corrupted"] = df
+        _state["clean"] = None
+        _state["gt_mask"] = None
+
+        table = df[["timestamp", "value"]].head(50)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=df["timestamp"], y=df["value"],
+            mode="lines", name="Yuklenen Veri",
+            line=dict(color="#f59e0b", width=1),
+        ))
+        fig.update_layout(
+            template=_TEMPLATE, paper_bgcolor=_BG,
+            plot_bgcolor=_GRID, height=350,
+        )
+        return fig, None, table, f"OK — {len(df)} satir yuklendi"
+    except Exception as e:
+        return None, None, None, f"HATA: {e}"
+
+
+def run_pipeline_ui(method):
+    if "corrupted" not in _state:
+        return None, "Once veri uretin veya yukleyin.", None, "", None, ""
+
+    corrupted = _state["corrupted"]
+    clean = _state.get("clean")
+
+    try:
+        result, logs = _run_with_logs(corrupted, method)
+    except Exception as e:
+        return None, f"Pipeline hatasi: {e}", None, "", None, ""
+
+    _state["result"] = result
+    _state["method"] = method
+
+    log_text = _format_pipeline_log(logs, method, result)
+    fig_overlay = _plot_triple_overlay(
+        clean, corrupted, result["cleaned_data"], result["fault_mask"],
+    )
+
+    # Metrics text
+    metrics = result.get("metrics", {})
+    faults = metrics.get("faults_detected", 0)
+    proc_time = metrics.get("processing_time", 0)
+
+    if clean is not None:
+        from pipeline.validator import calculate_metrics
+        gt_metrics = calculate_metrics(corrupted, result["cleaned_data"], ground_truth=clean)
+        metrics_text = (
+            f"RMSE: {gt_metrics.get('rmse', 0):.4f} | "
+            f"SNR: {gt_metrics.get('snr', 0):.2f} dB | "
+            f"R2: {gt_metrics.get('r2_score', 0):.4f} | "
+            f"Anomali: {faults} | Sure: {proc_time:.3f}s"
+        )
+    else:
+        metrics_text = f"Anomali: {faults} | Sure: {proc_time:.3f}s"
+
+    # Detector breakdown
+    try:
+        from pipeline.detector_classic import detect_all
+        from pipeline.filters_classic import detrend_signal
+        data_dt = detrend_signal(corrupted)
+        det_masks = detect_all(data_dt, df_original=corrupted)
+        fig_detectors = _plot_detector_breakdown(det_masks, corrupted)
+    except Exception:
+        fig_detectors = go.Figure()
+
+    # Fault timeline table
+    ft = result.get("fault_timeline", pd.DataFrame())
+    ft_display = ft.head(100) if not ft.empty else pd.DataFrame({"Bilgi": ["Anomali bulunamadi"]})
+
+    # Repair verification
+    rv = result.get("repair_verification", {})
+    if rv.get("passed", True):
+        rv_text = "Dogrulama basarili — yeni NaN/Inf yok, varyans normal"
+    else:
+        rv_text = "Sorun var: " + ", ".join(rv.get("issues", []))
+
+    return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text
+
+
+# ── Gradio UI ──────────────────────────────────────────────────────────────────
+
+theme = gr.themes.Base(
+    primary_hue=gr.themes.colors.cyan,
+    secondary_hue=gr.themes.colors.blue,
+    neutral_hue=gr.themes.colors.slate,
+    font=gr.themes.GoogleFont("Inter"),
+).set(
+    body_background_fill="*neutral_950",
+    body_background_fill_dark="*neutral_950",
+    block_background_fill="*neutral_900",
+    block_background_fill_dark="*neutral_900",
+    block_border_color="*neutral_700",
+    block_label_text_color="*neutral_200",
+    block_title_text_color="*neutral_100",
+    input_background_fill="*neutral_800",
+    input_background_fill_dark="*neutral_800",
+    button_primary_background_fill="*primary_600",
+    button_primary_text_color="white",
 )
 
-# ── Tab 1: Overview ─────────────────────────────────────────────────────────
-with tab_overview:
-    # Metric cards row
-    cols = st.columns(len(results))
-    all_metrics: dict = {}
+with gr.Blocks(
+    theme=theme,
+    title="Cosmic Pipeline",
+) as app:
 
-    for col, (method, res) in zip(cols, results.items()):
-        with col:
-            st.subheader(f"{method.upper()}")
-            if res.get("error"):
-                st.error(res["error"])
-                all_metrics[method] = None
-                continue
+    gr.Markdown("# 🛰️ Kozmik Veri Ayiklama ve Isleme Hatti")
+    gr.Markdown("**TUA Astro Hackathon 2026** — Ahmet & Omer")
 
-            cleaned = res["cleaned_data"]
-            fm = res["fault_mask"]
+    with gr.Tabs():
 
-            qm = calculate_metrics(corrupted_df, cleaned, ground_truth=clean_df)
+        # ── TAB 1: Veri ──────────────────────────────
+        with gr.Tab("📡 Veri"):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### Sentetik Veri Parametreleri")
+                    sl_n = gr.Slider(1000, 20000, value=5000, step=1000, label="Veri Noktasi")
+                    num_seed = gr.Number(value=42, label="Seed", precision=0)
+                    sl_seu = gr.Slider(5, 50, value=15, step=1, label="SEU (Bit-flip) Sayisi")
+                    sl_tid = gr.Slider(0.001, 0.01, value=0.003, step=0.001, label="TID Drift Egimi")
+                    sl_gap = gr.Slider(1, 10, value=4, step=1, label="Veri Boslugu Sayisi")
+                    sl_noise = gr.Slider(0.5, 5.0, value=2.0, step=0.1, label="Gurultu Seviyesi")
+                    btn_gen = gr.Button("🔬 Sentetik Veri Uret", variant="primary", size="lg")
 
-            det_bool = fm.values if hasattr(fm, "values") else np.array(fm)
-            if gt_mask is not None:
-                gt_bool = _gt_bool_mask(gt_mask, len(corrupted_df))
-                prec, rec, f1 = _precision_recall(det_bool, gt_bool)
-            else:
-                prec, rec, f1 = (np.nan, np.nan, np.nan)
+                    gr.Markdown("---")
+                    gr.Markdown("### CSV Yukle")
+                    csv_file = gr.File(label="CSV Dosyasi", file_types=[".csv"])
+                    btn_csv = gr.Button("📁 CSV Yukle")
 
-            m = {**qm, "precision": prec, "recall": rec, "f1": f1,
-                 "detected": int(fm.sum()), "time": res["elapsed"]}
-            all_metrics[method] = m
+                    txt_status = gr.Textbox(label="Durum", interactive=False)
 
-            c1, c2 = st.columns(2)
-            c1.metric("Faults detected", m["detected"])
-            c2.metric("Time (s)", f"{m['time']:.2f}")
+                with gr.Column(scale=3):
+                    plot_preview = gr.Plot(label="Sinyal Onizleme")
+                    with gr.Row():
+                        with gr.Column():
+                            gr.Markdown("#### Temiz Veri")
+                            tbl_clean = gr.Dataframe(label="Ground Truth", height=300)
+                        with gr.Column():
+                            gr.Markdown("#### Bozuk Veri")
+                            tbl_corrupt = gr.Dataframe(label="Radyasyonlu", height=300)
 
-            c3, c4 = st.columns(2)
-            c3.metric("RMSE", f"{m['rmse']:.2f}")
-            c4.metric("SNR (dB)", f"{m['snr']:.2f}")
-
-            c5, c6, c7 = st.columns(3)
-            c5.metric("Precision", f"{m['precision']:.2%}")
-            c6.metric("Recall", f"{m['recall']:.2%}")
-            c7.metric("F1", f"{m['f1']:.2%}")
-
-            st.plotly_chart(
-                plot_signal(cleaned, det_bool, title=f"{method} — cleaned signal"),
-                use_container_width=True,
+            btn_gen.click(
+                fn=generate_data,
+                inputs=[sl_n, num_seed, sl_seu, sl_tid, sl_gap, sl_noise],
+                outputs=[plot_preview, tbl_clean, tbl_corrupt, txt_status],
+            )
+            btn_csv.click(
+                fn=upload_csv,
+                inputs=[csv_file],
+                outputs=[plot_preview, tbl_clean, tbl_corrupt, txt_status],
             )
 
-            # --- Sampling info ---
-            sampling = res.get("sampling_info", {})
-            if sampling:
-                st.markdown("#### 📡 Örnekleme Analizi")
-                s1, s2, s3 = st.columns(3)
-                with s1:
-                    st.metric("Örnekleme Aralığı", f"{sampling.get('detected_interval', 0):.2f}s")
-                with s2:
-                    st.metric("Jitter", f"{sampling.get('jitter_ratio', 0):.2%}")
-                with s3:
-                    st.metric("Büyük Boşluk", sampling.get("n_large_gaps", 0))
+        # ── TAB 2: Pipeline ──────────────────────────
+        with gr.Tab("🔧 Pipeline"):
+            with gr.Row():
+                radio_method = gr.Radio(
+                    choices=["classic", "ml", "both"],
+                    value="classic",
+                    label="Pipeline Yontemi",
+                )
+                btn_run = gr.Button(
+                    "▶️ Pipeline Calistir", variant="primary", size="lg",
+                )
 
-            # --- Repair verification ---
-            rv = res.get("repair_verification", {})
-            if rv:
-                status = "✅ Geçti" if rv.get("passed") else "⚠️ Sorun Var"
-                st.markdown(f"#### 🔍 Onarım Doğrulama: {status}")
-                if rv.get("issues"):
-                    for issue in rv["issues"]:
-                        st.warning(issue)
+            txt_metrics = gr.Textbox(label="Metrikler", interactive=False)
 
-            # --- Repair confidence ---
-            rc = res.get("repair_confidence")
-            if rc is not None and fm.any():
-                mean_conf = float(rc[fm].mean())
-                st.metric("Ortalama Onarım Güveni", f"{mean_conf:.1%}")
+            with gr.Tabs():
+                with gr.Tab("📈 Sonuc Grafigi"):
+                    plot_result = gr.Plot(label="Ground Truth vs Bozuk vs Temizlenmis")
 
-# ── Tab 2: Comparison ──────────────────────────────────────────────────────
-with tab_compare:
-    valid_methods = [m for m in results if results[m].get("error") is None]
+                with gr.Tab("🔍 Detektor Detayi"):
+                    plot_det = gr.Plot(label="Her Dedektorun Buldugu Anomaliler")
 
-    if len(valid_methods) >= 2 and "classic" in valid_methods and "ml" in valid_methods:
-        classic_res = results["classic"]
-        ml_res = results["ml"]
+                with gr.Tab("📋 Islem Raporu"):
+                    code_log = gr.Code(label="Pipeline Log", language=None, lines=30)
 
-        fig_cmp = plot_comparison(
-            corrupted_df,
-            classic_res["cleaned_data"],
-            ml_res["cleaned_data"],
-            classic_res["fault_mask"].values,
-            ml_res["fault_mask"].values,
-        )
-        st.plotly_chart(fig_cmp, use_container_width=True)
+                with gr.Tab("📊 Anomali Tablosu"):
+                    tbl_faults = gr.Dataframe(label="Tespit Edilen Anomaliler", height=400)
 
-        mc = all_metrics.get("classic")
-        mm = all_metrics.get("ml")
-        if mc and mm:
-            fig_bar = plot_metrics_bar(mc, mm)
-            st.plotly_chart(fig_bar, use_container_width=True)
-    elif len(valid_methods) >= 2:
-        st.info("Comparison chart requires both **classic** and **ml** methods.")
-    else:
-        st.warning("Run at least two methods to see comparison charts.")
+                with gr.Tab("🔍 Dogrulama"):
+                    txt_verify = gr.Textbox(
+                        label="Onarim Dogrulama", interactive=False, lines=3,
+                    )
 
-# ── Tab 3: Timeline ────────────────────────────────────────────────────────
-with tab_timeline:
-    if gt_mask is not None:
-        for method in valid_methods:
-            res = results[method]
-            pred = res["fault_mask"].values if hasattr(res["fault_mask"], "values") else np.array(res["fault_mask"])
-            fig_tl = plot_anomaly_timeline(len(corrupted_df), gt_mask, pred)
-            fig_tl.update_layout(title=f"Timeline — {method}")
-            st.plotly_chart(fig_tl, use_container_width=True)
-    else:
-        st.info("Timeline requires synthetic data with ground truth.")
-
-# ── Tab 4: Export ───────────────────────────────────────────────────────────
-with tab_export:
-    for method in valid_methods:
-        res = results[method]
-        cleaned = res["cleaned_data"]
-        csv_data = cleaned.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            f"Download {method} cleaned CSV",
-            data=csv_data,
-            file_name=f"cleaned_{method}.csv",
-            mime="text/csv",
-        )
-
-    if all_metrics:
-        rows = []
-        for method, m in all_metrics.items():
-            if m is None:
-                continue
-            rows.append({"method": method, **m})
-        if rows:
-            metrics_df = pd.DataFrame(rows)
-            st.dataframe(metrics_df, use_container_width=True)
-            st.download_button(
-                "Download metrics CSV",
-                data=metrics_df.to_csv(index=False).encode("utf-8"),
-                file_name="metrics_comparison.csv",
-                mime="text/csv",
+            btn_run.click(
+                fn=run_pipeline_ui,
+                inputs=[radio_method],
+                outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify],
             )
+
+
+if __name__ == "__main__":
+    app.launch(server_port=7860, share=False)
