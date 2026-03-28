@@ -1,5 +1,6 @@
 """Pipeline orchestrator: ingestion -> detection -> hybrid ensemble -> filtering -> validation."""
 
+import copy
 import logging
 import time
 
@@ -19,6 +20,39 @@ VALID_METHODS = ("classic", "ml", "both")
 
 # Detectors whose output is treated as "hard" (any-True → anomaly)
 HARD_DETECTORS = {"gaps", "range", "delta", "flatline", "duplicates"}
+
+DEFAULT_CONFIG = {
+    "dsp_detector": {
+        "zscore_threshold": 2.0,
+        "window": 50,
+        "window_threshold": 3.0,
+        "max_gap_seconds": 60,
+        "range_std_multiplier": 10.0,
+        "delta_multiplier": 5.0,
+        "iforest_contamination": 0.05,
+    },
+    "lstm_detector": {
+        "model_path": "models/lstm_ae.pt",
+        "threshold_percentile": 95.0,
+    },
+    "ensemble": {
+        "min_agreement": 2,
+    },
+    "classic_filter": {
+        "median_window": 5,
+    },
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base."""
+    result = copy.deepcopy(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 def run_pipeline(
@@ -49,8 +83,7 @@ def run_pipeline(
     if method not in VALID_METHODS:
         raise ValueError(f"Invalid method '{method}'. Must be one of {VALID_METHODS}")
 
-    if config is None:
-        config = {}
+    config = _deep_merge(DEFAULT_CONFIG, config or {})
 
     t_start = time.perf_counter()
     tracer = PipelineTracer()
