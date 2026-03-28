@@ -159,40 +159,58 @@ def run_pipeline(
         total_count=int(fault_mask.sum()),
     )
 
-    # --- 5. Filtering ---
+    # --- 5. Repair eligibility (BEFORE filtering) ---
+    faults_detected = int(fault_mask.sum())
+    fault_timeline = _build_fault_timeline(data, detector_masks, fault_mask)
+
+    from pipeline.validator import assess_repair_eligibility
+    fault_timeline = assess_repair_eligibility(data, fault_mask, fault_timeline)
+
+    # Remove preserve/flag_only points from fault_mask before filtering
+    repair_mask = fault_mask.copy()
+    if not fault_timeline.empty and "repair_decision" in fault_timeline.columns:
+        skip_indices: set[int] = set()
+        for _, row in fault_timeline.iterrows():
+            if row.get("repair_decision") in ("preserve", "flag_only"):
+                ts = row["timestamp"]
+                matching = data.index[data["timestamp"] == ts]
+                skip_indices.update(matching.tolist())
+        if skip_indices:
+            for idx in skip_indices:
+                if idx in repair_mask.index:
+                    repair_mask.iloc[idx] = False
+            logger.info(
+                "Repair decision: %d points skipped (preserve/flag_only)",
+                len(skip_indices),
+            )
+
+    # --- 6. Filtering (only on repairable points) ---
     logger.info("Step 4: Filtering (method=%s)", method)
     flt_cfg = config.get("classic_filter", {})
     cleaned_data = apply_classic_filters(
         data,
-        fault_mask,
+        repair_mask,
         median_window=flt_cfg.get("median_window", 5),
     )
 
-    tracer.snapshot("Filtreleme", "Interpolation -> Detrend -> Median (mercek modeli)", data, cleaned_data)
+    tracer.snapshot("Filtreleme", "Interpolation -> Detrend -> Median (sadece repair noktalar)", data, cleaned_data)
 
-    # --- 6. Validation ---
+    # --- 7. Validation ---
     logger.info("Step 5: Validation")
     validate_output(cleaned_data)
     tracer.snapshot("Dogrulama", "Temizlenmis sinyal kalite kontrolu", cleaned_data, cleaned_data)
 
     processing_time = time.perf_counter() - t_start
-    faults_detected = int(fault_mask.sum())
-    faults_corrected = faults_detected
-
-    fault_timeline = _build_fault_timeline(data, detector_masks, fault_mask)
-
-    # Repair eligibility assessment
-    from pipeline.validator import assess_repair_eligibility
-    fault_timeline = assess_repair_eligibility(data, fault_mask, fault_timeline)
+    faults_corrected = int(repair_mask.sum())
 
     # Repair confidence scoring
     from pipeline.validator import calculate_repair_confidence, verify_repair
     repair_confidence = calculate_repair_confidence(
-        data, cleaned_data, fault_mask, detector_masks,
+        data, cleaned_data, repair_mask, detector_masks,
     )
 
     # Repair verification
-    repair_verification = verify_repair(data, cleaned_data, fault_mask)
+    repair_verification = verify_repair(data, cleaned_data, repair_mask)
 
     logger.info(
         "Pipeline complete (method=%s): %d faults detected, %.3fs elapsed",
