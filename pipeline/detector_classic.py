@@ -183,11 +183,18 @@ def detect_flatline(
 
     run_start = 0
     for i in range(1, n):
-        if abs(values[i] - values[run_start]) > tolerance or not np.isfinite(values[i]):
+        # NaN'ler flatline değil — gap dedektörü yakalar
+        if not np.isfinite(values[i]) or not np.isfinite(values[run_start]):
+            if i - run_start >= min_duration and np.isfinite(values[run_start]):
+                mask[run_start:i] = True
+            run_start = i
+            continue
+        if abs(values[i] - values[run_start]) > tolerance:
             if i - run_start >= min_duration:
                 mask[run_start:i] = True
             run_start = i
-    if n - run_start >= min_duration:
+    # Son run kontrolü
+    if n - run_start >= min_duration and np.isfinite(values[run_start]):
         mask[run_start:n] = True
 
     n_detected = int(mask.sum())
