@@ -1,132 +1,93 @@
-# 🌌 Cosmic Pipeline
+# Cosmic Pipeline
 
-> TUA Astro Hackathon 2026 | Radyasyonla bozulmuş uydu telemetrisini temizleyen hibrit DSP + ML pipeline
+> TUA Astro Hackathon 2026 | Radyasyonla bozulmus uydu telemetrisini temizleyen hibrit DSP + ML pipeline
 
 ## Quickstart
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Train LSTM AE model (run once before hackathon)
-make train
-
-# Launch dashboard
-make run
+python dashboard/app.py          # -> http://localhost:7860
 ```
 
 ## Architecture
 
 ```
-Ingestion (CSV / GOES JSON)
-       ↓
-  ┌────┴────┐
-Classic    ML
-  DSP    (IF + LSTM AE)
-  ↓          ↓
-  └────┬────┘
-  Ensemble Vote
-       ↓
-  Streamlit Dashboard
+CSV / Excel / JSON / Synthetic Generator
+       |
+   Ingestion (parse + schema validation)
+       |
+   Detrend (linear trend removal -- detection copy only)
+       |
+  +----+----+
+Classic      ML
+(7 det.)   (IF + LSTM AE)
+  |           |
+  +----+-----+
+  Hybrid Ensemble
+  (hard rules: ANY  +  soft: MAJORITY >=2)
+       |
+  Repair Decision (repair / flag_only / preserve)
+       |
+  Filtering -- ONLY on repairable anomalies
+  (interpolation -> detrend -> median)
+       |
+  Validation + Repair Verification
+       |
+  Tracer (step-by-step report)
+       |
+  Gradio Dashboard
 ```
-
-## Data Sources
-
-| Source | Type | Details |
-|--------|------|---------|
-| Synthetic Generator | Controlled | SEU bit-flip, TID drift, data gaps, noise floor rise |
-| NOAA SWPC GOES-16 | Real-time | Proton flux JSON API — live solar particle data |
 
 ## Fault Types
 
 | Fault | Physical Cause | Signature |
 |-------|----------------|-----------|
-| SEU | High-energy particle bit-flip | Instant spike to physically impossible value |
+| SEU | High-energy particle bit-flip | Instant spike to impossible value |
 | TID Drift | Cumulative ionizing dose | Monotonic calibration bias |
 | Data Gap | Latch-up / transmission error | Consecutive NaN blocks |
-| Noise Floor | Radiation background rise | Increasing signal variance over time |
+| Noise Floor | Radiation background rise | Increasing signal variance |
+
+## Detectors (9 total)
+
+**Hard rules** (any-True -> anomaly): `gaps`, `range`, `delta`, `flatline`, `duplicates`
+
+**Soft** (>=2 agreement): `zscore`, `sliding_window`, `isolation_forest`, `lstm_ae`
 
 ## Team
 
 | Role | Person |
 |------|--------|
-| 🟠 Python / AI / Algo | Ahmet Hüsrev Sayın |
-| 🔵 Infra / Dashboard  | Ömer Can Gümüş |
-
-## Branch Strategy
-
-```
-main ← develop ← feature/omer-day1-infra
-              ← feature/omer-day2-dashboard
-              ← feature/ahmet-day1-core
-              ← feature/ahmet-day2-ml
-```
-
-Merge flow: `feature/*` → `develop` → `main` (checkpoint only)
-
-Tags: `v0.1-day1-checkpoint` · `v1.0-hackathon-final`
+| Python / AI / Algo | Ahmet Husrev Sayin |
+| Infra / Dashboard  | Omer Can Gumus |
 
 ## Commands
 
 ```bash
 make install   # install dependencies
-make run       # launch Streamlit dashboard
-make test      # run pytest with coverage
+make run       # launch Gradio dashboard
+make test      # pytest with coverage
 make train     # train LSTM AE model
-make generate  # generate synthetic test data
-make lint      # run linting checks
 ```
 
-## Metrics
+## Docker
 
-> ⚠️ Metrics are computed live from the pipeline.
-> Run `make run` → Tab 1 → Generate Signal → Run Pipeline → Comparison tab.
+```bash
+docker compose up -d    # -> http://localhost:7860
+```
 
 ## Project Structure
 
 ```
-cosmic-pipeline/
-├── .github/
-│   └── PULL_REQUEST_TEMPLATE.md
-├── pipeline/
-│   ├── detectors/
-│   │   ├── dsp_detector.py
-│   │   └── lstm_detector.py
-│   ├── filters/
-│   │   ├── classic_filter.py
-│   │   └── ml_reconstructor.py
-│   ├── ensemble_voter.py
-│   └── pipeline.py
-├── data/
-│   ├── synthetic_generator.py
-│   ├── goes_downloader.py
-│   └── raw/
-├── models/
-│   ├── lstm_autoencoder.py
-│   └── train.py
-├── dashboard/
-│   ├── app.py
-│   └── charts.py
-├── config/
-│   ├── config.py
-│   ├── parser.py
-│   ├── default.yaml
-│   ├── fast.yaml
-│   └── accurate.yaml
-├── utils/
-│   ├── validation.py
-│   ├── metrics.py
-│   └── logging.py
-├── tests/
-│   └── ...
-├── notebooks/
-│   └── goes_exploration.ipynb
-├── .gitignore
-├── requirements.txt
-├── Makefile
-└── README.md
+cosmic_pipeline/
++-- pipeline/           # Core: orchestrator, detectors, ensemble, filters, validator, tracer
++-- data/               # Synthetic telemetry generator (20 satellite channels)
++-- models/             # LSTM Autoencoder (train + inference + lstm_ae.pt)
++-- dashboard/          # Gradio app
++-- config/             # YAML config system
++-- utils/              # CSV/TSV/Excel/JSON parser
++-- tests/              # Unit + integration tests
 ```
 
 ## License
 
-MIT License - TUA Astro Hackathon 2026
+MIT License -- TUA Astro Hackathon 2026
