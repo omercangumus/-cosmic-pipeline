@@ -85,3 +85,7 @@ docker compose up -d                 # Docker ile calistirma
 - Moduler tasarim — her modul bagimsiz test edilebilir
 - print() yerine logging
 - Config degerleri fonksiyon parametresi olsun, hardcode etme
+
+## Bilinen Kisitlar
+- **Tek kanal**: Pipeline tek `value` kolonu isliyor. Multi-column CSV'de sadece ilk numeric kolon alinir.
+- Multi-channel support roadmap'te — her kolon icin ayri pipeline calistirma + dashboard multi-channel plot gerekli.

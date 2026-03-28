@@ -88,6 +88,19 @@ cosmic_pipeline/
 +-- tests/              # Unit + integration tests
 ```
 
+## Current Limitations
+
+- **Single-channel processing**: Pipeline processes one sensor column (`value`) at a time. Multi-column CSV files are accepted but only the first numeric column is used.
+- **No real-time streaming**: Batch processing only.
+- **No HDF5/Parquet support**: CSV, TSV, Excel, JSON, netCDF4 supported.
+
+## Roadmap
+
+- [ ] **Multi-channel pipeline**: Process all numeric columns in parallel, per-channel anomaly detection and filtering
+- [ ] Real-time streaming support
+- [ ] HDF5/Parquet format support
+- [ ] Adaptive threshold tuning per sensor type
+
 ## License
 
 MIT License -- TUA Astro Hackathon 2026
