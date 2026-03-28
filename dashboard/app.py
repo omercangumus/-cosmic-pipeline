@@ -9,7 +9,7 @@ import logging
 
 import gradio as gr
 
-from dashboard.handlers import export_cleaned, generate_data, run_pipeline_ui, upload_csv
+from dashboard.handlers import export_cleaned, generate_data, run_pipeline_ui, start_game_pipeline, upload_csv
 
 logging.basicConfig(level=logging.INFO)
 
@@ -140,10 +140,36 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
         # ── TAB 3: DataCraft ─────────────────────────
         with gr.Tab("🎮 DataCraft"):
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### 🎮 Oyun Kontrolleri")
+                    game_samples = gr.Slider(
+                        minimum=500, maximum=10000, value=2000, step=500,
+                        label="Veri Noktasi",
+                    )
+                    game_method = gr.Radio(
+                        choices=["classic", "both"],
+                        value="classic",
+                        label="Pipeline Yontemi",
+                    )
+                    btn_game = gr.Button(
+                        "🚀 Oyuna Basla", variant="primary", size="lg",
+                    )
+                    game_status = gr.Textbox(
+                        label="Pipeline Durumu", interactive=False,
+                    )
+                    game_result = gr.HTML(label="Sonuc")
+
             _game_path = Path(__file__).parent / "game.html"
             gr.HTML(
                 value=_game_path.read_text(encoding="utf-8"),
                 label="Kozmik Veri Görselleştirme",
+            )
+
+            btn_game.click(
+                fn=start_game_pipeline,
+                inputs=[game_samples, game_method],
+                outputs=[game_result, game_status],
             )
 
 

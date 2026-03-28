@@ -318,6 +318,60 @@ def export_cleaned():
     return gr.update(value=path, visible=True)
 
 
+def start_game_pipeline(n_samples, method):
+    """DataCraft: generate synthetic data + run pipeline + return result for game."""
+    try:
+        import json
+        from data.synthetic_generator import generate_corrupted_dataset
+
+        clean, corrupted, mask = generate_corrupted_dataset(
+            n=int(n_samples), seed=None,
+        )
+
+        result = run_pipeline(corrupted[["timestamp", "value"]], method=method)
+
+        m = result["metrics"]
+        counts = result.get("detector_counts", {})
+
+        game_data = {
+            "faults_detected": m["faults_detected"],
+            "faults_corrected": m.get("faults_corrected", m["faults_detected"]),
+            "processing_time": round(m["processing_time"], 2),
+            "detectors": counts,
+            "total_points": int(n_samples),
+            "corruption_ratio": round(m["faults_detected"] / max(int(n_samples), 1), 2),
+        }
+
+        active = ", ".join(f"{k}:{v}" for k, v in counts.items() if v > 0)
+        js_code = (
+            f"<script>"
+            f"(function(){{"
+            f"const data={json.dumps(game_data)};"
+            f"const frames=document.querySelectorAll('iframe');"
+            f"frames.forEach(f=>{{try{{f.contentWindow.cosmicUpdate(data)}}catch(e){{}}}});"
+            f"if(window.cosmicUpdate)window.cosmicUpdate(data);"
+            f"}})();"
+            f"</script>"
+            f"<div style='color:#00ff88;font-family:monospace;padding:10px;"
+            f"background:#0a0e17;border-radius:8px;'>"
+            f"🛰️ Veri: {int(n_samples)} nokta<br>"
+            f"⚠️ Anomali: {m['faults_detected']} ({game_data['corruption_ratio']:.0%})<br>"
+            f"🔧 Yontem: {method.upper()}<br>"
+            f"⏱️ Sure: {m['processing_time']:.2f}s<br>"
+            f"📊 Dedektorler: {active}"
+            f"</div>"
+        )
+
+        status = (
+            f"Pipeline tamamlandi: {m['faults_detected']} anomali bulundu "
+            f"ve temizlendi ({m['processing_time']:.2f}s)"
+        )
+        return js_code, status
+
+    except Exception as e:
+        return f"<div style='color:red;'>HATA: {e}</div>", _user_friendly_error(e)
+
+
 def run_pipeline_ui(method, selected_columns):
     """Run the pipeline and return all UI outputs."""
     if "corrupted" not in _state:

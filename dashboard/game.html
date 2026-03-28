@@ -212,31 +212,22 @@ window.addEventListener('resize', () => {
 });
 
 // === API ===
-window.cosmicUpdate = updateFromPipeline;
+window.cosmicUpdate = function(result) {
+  // Yeni veri gelince önce bozuk duruma geç, sonra temizle
+  corruptionLevel = result.corruption_ratio || 0.8;
+  state = 'corrupt';
+  faultsDetected = 0;
+  faultsCorrected = 0;
+  document.getElementById('status').style.opacity = '1';
+  document.getElementById('status').textContent = '⚠️ Radyasyon algılandı! Temizleniyor...';
+  document.getElementById('status').style.color = '#ff4444';
+  // 1.5 sn bozuk göster, sonra temizleme başlat
+  setTimeout(function() { updateFromPipeline(result); }, 1500);
+};
 
-// === DEMO: 3 sn sonra otomatik temizleme ===
-setTimeout(() => {
-  updateFromPipeline({
-    faults_detected: 156,
-    faults_corrected: 156,
-    processing_time: 2.15,
-  });
-}, 3000);
-
-// === Yeni bozulma döngüsü ===
-setInterval(() => {
-  if (state === 'clean') {
-    setTimeout(() => {
-      corruptionLevel = 0.7 + Math.random() * 0.3;
-      state = 'corrupt';
-      faultsDetected = 0;
-      faultsCorrected = 0;
-      document.getElementById('status').style.opacity = '1';
-      document.getElementById('status').textContent = '⚠️ Yeni radyasyon dalgası algılandı!';
-      document.getElementById('status').style.color = '#ff4444';
-    }, 5000);
-  }
-}, 15000);
+// === Gradio'dan tetikleme bekleniyor ===
+document.getElementById('status').textContent = '⚠️ Radyasyon algılandı! Pipeline başlatın...';
+document.getElementById('status').style.color = '#ff4444';
 </script>
 </body>
 </html>
