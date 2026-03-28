@@ -1,11 +1,14 @@
 """Streamlit dashboard for the Cosmic Pipeline — visualize, compare, export."""
 
+import logging
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import streamlit as st
 
 # Ensure project root is on the path so pipeline imports work
@@ -105,6 +108,125 @@ def _run(corrupted_df: pd.DataFrame, method: str):
 
 
 # ---------------------------------------------------------------------------
+# Pipeline log capture
+# ---------------------------------------------------------------------------
+_PIPELINE_LOGGERS = [
+    "pipeline.orchestrator",
+    "pipeline.detector_classic",
+    "pipeline.detector_ml",
+    "pipeline.ensemble",
+    "pipeline.filters_classic",
+    "pipeline.filters_ml",
+    "pipeline.validator",
+    "pipeline.ingestion",
+]
+
+
+class _DashboardLogHandler(logging.Handler):
+    """Captures pipeline log records with elapsed timestamps."""
+
+    def __init__(self):
+        super().__init__()
+        self.logs: list[str] = []
+        self.start_time: float | None = None
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if self.start_time is None:
+            self.start_time = time.time()
+        elapsed = time.time() - self.start_time
+        msg = self.format(record)
+        self.logs.append(f"[{elapsed:07.3f}] {msg}")
+
+
+def _run_with_logs(corrupted_df: pd.DataFrame, method: str) -> tuple[dict, list[str]]:
+    """Run pipeline and return (result_dict, log_lines)."""
+    handler = _DashboardLogHandler()
+    handler.setLevel(logging.INFO)
+    handler.start_time = time.time()
+
+    for name in _PIPELINE_LOGGERS:
+        logging.getLogger(name).addHandler(handler)
+        logging.getLogger(name).setLevel(logging.INFO)
+
+    try:
+        result = run_pipeline(corrupted_df.copy(), method=method)
+    finally:
+        for name in _PIPELINE_LOGGERS:
+            logging.getLogger(name).removeHandler(handler)
+
+    return result, handler.logs
+
+
+def _plot_clean_vs_corrupted(clean_df, corrupted_df):
+    """Two-row subplot: clean signal on top, corrupted on bottom."""
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True,
+        subplot_titles=["Temiz Sinyal (Ground Truth)", "Radyasyonla Bozulmuş Sinyal"],
+        vertical_spacing=0.10,
+    )
+    fig.add_trace(go.Scatter(
+        x=clean_df["timestamp"], y=clean_df["value"],
+        mode="lines", name="Temiz", line=dict(color="#00ff88", width=1),
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=corrupted_df["timestamp"], y=corrupted_df["value"],
+        mode="lines", name="Bozuk", line=dict(color="#f59e0b", width=1),
+    ), row=2, col=1)
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,14,23,0.8)",
+        height=480,
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.08),
+        margin=dict(t=40, b=50, l=60, r=30),
+    )
+    return fig
+
+
+def _plot_triple_overlay(clean_df, corrupted_df, cleaned_df, fault_mask=None):
+    """Three signals overlaid: ground truth, corrupted, cleaned."""
+    fig = go.Figure()
+    if clean_df is not None:
+        fig.add_trace(go.Scatter(
+            x=clean_df["timestamp"], y=clean_df["value"],
+            mode="lines", name="Ground Truth",
+            line=dict(color="#00ff88", width=1, dash="dot"),
+        ))
+    fig.add_trace(go.Scatter(
+        x=corrupted_df["timestamp"], y=corrupted_df["value"],
+        mode="lines", name="Bozuk (Ham)",
+        line=dict(color="#f59e0b", width=1), opacity=0.4,
+    ))
+    fig.add_trace(go.Scatter(
+        x=cleaned_df["timestamp"], y=cleaned_df["value"],
+        mode="lines", name="Temizlenmiş",
+        line=dict(color="#00d4ff", width=2),
+    ))
+    if fault_mask is not None:
+        mask_arr = fault_mask.values if hasattr(fault_mask, "values") else np.array(fault_mask)
+        if mask_arr.any():
+            idx = np.where(mask_arr)[0]
+            fig.add_trace(go.Scatter(
+                x=corrupted_df["timestamp"].iloc[idx],
+                y=corrupted_df["value"].iloc[idx],
+                mode="markers", name="Anomali",
+                marker=dict(color="#ff4444", size=3, symbol="x", opacity=0.6),
+            ))
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,14,23,0.8)",
+        title="Ground Truth vs Bozuk vs Temizlenmiş Sinyal",
+        height=420,
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.12),
+        margin=dict(t=50, b=60, l=60, r=30),
+    )
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Sidebar — data source & parameters
 # ---------------------------------------------------------------------------
 with st.sidebar:
@@ -117,10 +239,19 @@ with st.sidebar:
     if source == "Upload CSV":
         uploaded = st.file_uploader("CSV (timestamp, value)", type=["csv"])
         if uploaded is not None:
-            user_df = pd.read_csv(uploaded)
-            if "timestamp" not in user_df.columns or "value" not in user_df.columns:
-                st.error("CSV must have `timestamp` and `value` columns.")
+            import base64 as _b64
+            from utils.csv_parser import parse_uploaded_csv
+
+            raw_bytes = uploaded.getvalue()
+            encoded = _b64.b64encode(raw_bytes).decode()
+            contents = f"data:text/csv;base64,{encoded}"
+
+            user_df, csv_error = parse_uploaded_csv(contents, uploaded.name)
+            if csv_error is not None:
+                st.error(f"❌ {csv_error}")
                 st.stop()
+
+            st.success(f"✅ {len(user_df)} satır yüklendi ({uploaded.name})")
             clean_df = None
             corrupted_df = user_df
             gt_mask = None
@@ -159,7 +290,12 @@ st.markdown("# 🛰️ Cosmic Pipeline Dashboard")
 if not run_btn and "results" not in st.session_state:
     # Show raw data preview while waiting for the user to click Run
     st.info("Configure parameters in the sidebar and click **Run Pipeline**.")
-    if corrupted_df is not None:
+    if corrupted_df is not None and clean_df is not None:
+        st.plotly_chart(
+            _plot_clean_vs_corrupted(clean_df, corrupted_df),
+            use_container_width=True,
+        )
+    elif corrupted_df is not None:
         st.plotly_chart(
             plot_signal(corrupted_df, title="Corrupted Signal (preview)"),
             use_container_width=True,
@@ -169,6 +305,7 @@ if not run_btn and "results" not in st.session_state:
 # --- Execute pipeline -------------------------------------------------------
 if run_btn:
     results: dict = {}
+    all_logs: dict[str, list[str]] = {}
     progress = st.progress(0, text="Starting pipeline...")
     for i, method in enumerate(methods_to_run):
         progress.progress(
@@ -177,27 +314,61 @@ if run_btn:
         )
         t0 = time.perf_counter()
         try:
-            res = _run(corrupted_df, method)
+            res, logs = _run_with_logs(corrupted_df, method)
             res["elapsed"] = time.perf_counter() - t0
             res["error"] = None
             results[method] = res
+            all_logs[method] = logs
         except Exception as exc:
             results[method] = {"error": str(exc), "elapsed": time.perf_counter() - t0}
+            all_logs[method] = [f"[ERROR] {exc}"]
 
     progress.progress(100, text="Done!")
     st.session_state["results"] = results
+    st.session_state["all_logs"] = all_logs
     st.session_state["corrupted_df"] = corrupted_df
     st.session_state["clean_df"] = clean_df
     st.session_state["gt_mask"] = gt_mask
 
 # Retrieve stored results
 results = st.session_state.get("results", {})
+all_logs = st.session_state.get("all_logs", {})
 corrupted_df = st.session_state.get("corrupted_df", corrupted_df)
 clean_df = st.session_state.get("clean_df", clean_df)
 gt_mask = st.session_state.get("gt_mask", gt_mask)
 
 if not results:
     st.stop()
+
+# --- Clean vs Corrupted comparison (if synthetic) ---------------------------
+if clean_df is not None:
+    st.plotly_chart(
+        _plot_clean_vs_corrupted(clean_df, corrupted_df),
+        use_container_width=True,
+    )
+
+# --- Pipeline log panel -----------------------------------------------------
+if all_logs:
+    st.markdown("### 📋 Pipeline Log")
+    log_tabs = st.tabs([f"📝 {m.upper()}" for m in all_logs])
+    for tab, (method, logs) in zip(log_tabs, all_logs.items()):
+        with tab:
+            log_text = "\n".join(logs) if logs else "(boş log)"
+            st.code(log_text, language="bash")
+
+# --- Triple overlay per method ----------------------------------------------
+valid_results = {m: r for m, r in results.items() if r.get("error") is None}
+if valid_results:
+    st.markdown("### 📊 Ground Truth vs Bozuk vs Temizlenmiş")
+    for method, res in valid_results.items():
+        st.plotly_chart(
+            _plot_triple_overlay(
+                clean_df, corrupted_df, res["cleaned_data"], res["fault_mask"],
+            ),
+            use_container_width=True,
+        )
+
+st.markdown("---")
 
 # --- Tabs --------------------------------------------------------------------
 tab_overview, tab_compare, tab_timeline, tab_export = st.tabs(
