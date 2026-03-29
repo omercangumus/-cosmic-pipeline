@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from dashboard.handlers_modern import _generate_pipeline_animation
 from data.synthetic_generator import FaultConfig, generate_corrupted_dataset
 from pipeline.orchestrator import run_pipeline, run_pipeline_multi
 
@@ -407,7 +408,7 @@ def start_game_pipeline(n_samples, method):
 def run_pipeline_ui(method, selected_columns):
     """Run the pipeline and return all UI outputs."""
     if "corrupted" not in _state:
-        return None, "Once veri uretin veya yukleyin.", None, "", None, "", None, ""
+        return "", None, "Once veri uretin veya yukleyin.", None, "", None, "", None, ""
 
     clean = _state.get("clean")
     raw_multi = _state.get("raw_multi")
@@ -429,7 +430,7 @@ def run_pipeline_ui(method, selected_columns):
                 for name in _PIPELINE_LOGGERS:
                     logging.getLogger(name).removeHandler(handler)
         except Exception as e:
-            return None, _user_friendly_error(e), None, "", None, "", None, ""
+            return "", None, _user_friendly_error(e), None, "", None, "", None, ""
 
         summary = multi_result["summary"]
         channels = multi_result["channels"]
@@ -495,7 +496,12 @@ def run_pipeline_ui(method, selected_columns):
         tracer_table = first_valid.get("tracer_table", pd.DataFrame()) if first_valid else pd.DataFrame()
         tracer_summary = first_valid.get("tracer_summary", "") if first_valid else ""
 
-        return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
+        pipeline_viz_html = ""
+        if first_valid:
+            corrupted_for_viz = _state.get("corrupted", corrupted)
+            pipeline_viz_html = _generate_pipeline_animation(first_valid, corrupted_for_viz)
+
+        return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
 
     # ── Single-channel mode ──
     corrupted = _state["corrupted"]
@@ -510,7 +516,7 @@ def run_pipeline_ui(method, selected_columns):
     try:
         result, logs = _run_with_logs(corrupted, method)
     except Exception as e:
-        return None, _user_friendly_error(e), None, "", None, "", None, ""
+        return "", None, _user_friendly_error(e), None, "", None, "", None, ""
 
     _state["result"] = result
     _state["method"] = method
@@ -557,4 +563,6 @@ def run_pipeline_ui(method, selected_columns):
     tracer_table = result.get("tracer_table", pd.DataFrame())
     tracer_summary = result.get("tracer_summary", "")
 
-    return fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
+    pipeline_viz_html = _generate_pipeline_animation(result, corrupted)
+
+    return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary

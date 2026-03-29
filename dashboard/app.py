@@ -107,6 +107,9 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
             txt_metrics = gr.Textbox(label="Metrikler", interactive=False)
 
             with gr.Tabs():
+                with gr.Tab("🎯 Pipeline Gorsellestirme"):
+                    html_pipeline_viz = gr.HTML(label="Pipeline Hikayesi")
+
                 with gr.Tab("📈 Sonuc Grafigi"):
                     plot_result = gr.Plot(label="Ground Truth vs Bozuk vs Temizlenmis")
 
@@ -131,7 +134,7 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
             btn_run.click(
                 fn=run_pipeline_ui,
                 inputs=[radio_method, chk_columns],
-                outputs=[plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
+                outputs=[html_pipeline_viz, plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
             )
 
             with gr.Row():
