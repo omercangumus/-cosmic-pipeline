@@ -106,9 +106,21 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
 
     def _build_detail(det_name, stats):
         """Dedektore ozel detay HTML uret."""
-        if stats is None:
+        if stats is None and det_name == "gaps":
+            problem = f'''<div class="det-label">\u274C PROBLEM</div>
+                <div class="det-value det-red">Veri boslugu (NaN / eksik nokta)</div>
+                <div class="det-detail">
+                    <span class="dt-item">Max izin verilen bosluk: <b>60 saniye</b></span>
+                    <span class="dt-item">Tespit edilen bosluklar interpolasyon ile dolduruldu</span>
+                </div>'''
+            method = f'''<div class="det-label">\U0001F50D NASIL YAKALANDI</div>
+                <div class="det-formula">Ardisik timestamp farki &gt; 60s veya NaN degeri</div>
+                <div class="det-value det-blue">Eksik veri noktalarinin konumu belirlendi</div>'''
+            repair_html = '<div class="det-repair">Interpolasyon ile dolduruldu</div>'
+            return problem, method, repair_html
+        elif stats is None:
             return (
-                '<div class="det-block det-full"><div class="det-value">Istatistik hesaplanamadi</div></div>',
+                '<div class="det-value" style="color:#7d8590">Istatistik hesaplanamadi</div>',
                 "",
                 "",
             )
@@ -325,11 +337,12 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
         rmse = quality_metrics.get("rmse")
         snr = quality_metrics.get("snr")
         r2 = quality_metrics.get("r2_score")
-        if rmse is not None:
-            quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{rmse:.2f}</div><div class="stat-label">RMSE</div></div>'
-        if snr is not None:
-            quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{snr:.1f}</div><div class="stat-label">SNR (dB)</div></div>'
-        if r2 is not None:
+        # Sadece mantikli sonuclar goster
+        if r2 is not None and r2 > 0:
+            if rmse is not None:
+                quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{rmse:.2f}</div><div class="stat-label">RMSE</div></div>'
+            if snr is not None and snr > 0:
+                quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{snr:.1f}</div><div class="stat-label">SNR (dB)</div></div>'
             quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{r2:.3f}</div><div class="stat-label">R\u00B2</div></div>'
 
     quality_row = ""
