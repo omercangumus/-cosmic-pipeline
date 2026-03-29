@@ -13,10 +13,6 @@ AI-Powered Satellite Telemetry Anomaly Detection & Repair
 Uzay ortamında uydu sensörleri kozmik radyasyona maruz kalır. Bu radyasyon telemetri verilerinde SEU (bit-flip), TID drift, veri boşlukları ve sensör donmaları oluşturur. Bu proje, bozulan uydu telemetri verilerini otomatik olarak tespit edip onaran bir veri işleme pipeline'ıdır.
 
 Sistem dual-track mimarisiyle çalışır: klasik sinyal işleme (DSP) teknikleri ile makine öğrenimi/derin öğrenme modellerini bir arada kullanarak yüksek doğruluklu anomali tespiti ve onarım gerçekleştirir.
-
-![Veri Önizleme](<img width="1474" height="1149" alt="image" src="https://github.com/user-attachments/assets/1b3ada30-29e9-4b6f-abb1-b9c9005aeaed" />
-)
-
 ---
 
 ## 🏗️ Çözüm Mimarisi
@@ -82,9 +78,6 @@ Sentetik veri üretimi (NOAA GOES-16 profilleri) veya gerçek CSV/TSV/Excel/JSON
 - 🔬 **Adım Adım İzleme:** Pipeline tracer tablosu
 
 
-![Pipeline Görselleştirme](<img width="302" height="1097" alt="image" src="https://github.com/user-attachments/assets/7c8438cc-4083-496f-a775-73c3affd56ce" />
-)
-
 ---
 
 ## 🎮 DataCraft v5
@@ -98,8 +91,6 @@ Three.js tabanlı 3D eğitici oyun:
 - WASD + mouse kontrol, görev briefing paneli
 - 3-2-1 countdown otomatik geçiş
 
-![DataCraft v5](<img width="2519" height="1679" alt="image" src="https://github.com/user-attachments/assets/27199b42-08b7-425d-9f1e-9b4e693c6bde" />
-)
 
 ---
 
