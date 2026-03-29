@@ -47,6 +47,16 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
         "lstm_ae": {"name": "LSTM Autoencoder (DL)", "icon": "\U0001F9E0"},
     }
 
+    # Pipeline piramit katmanlari — gosterim sirasi
+    LAYER_ORDER = [
+        ("KATMAN 1 \u2014 Deterministik Kurallar", ["gaps", "range", "delta", "flatline", "duplicates"]),
+        ("KATMAN 2 \u2014 Istatistiksel Analiz", ["zscore", "sliding_window"]),
+        ("KATMAN 3 \u2014 Makine Ogrenimi", ["isolation_forest"]),
+        ("KATMAN 4 \u2014 Derin Ogrenme", ["lstm_ae"]),
+    ]
+
+    quality_metrics = result.get("quality_metrics", {})
+
     def _get_stats(det_name):
         """Bu dedektorun istatistiklerini hesapla."""
         if fault_timeline is None or fault_timeline.empty:
@@ -88,6 +98,7 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
         if cln_vals:
             stats["cln_mean"] = float(np.mean(cln_vals))
             stats["diff_mean"] = float(np.mean(diffs))
+            stats["diff_median"] = float(np.median(diffs))
             stats["diff_min"] = float(np.min(diffs))
             stats["diff_max"] = float(np.max(diffs))
 
@@ -230,71 +241,103 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
         repair_html = f'<div class="det-repair">{repair}</div>' if repair else ""
         return problem, method, repair_html
 
-    # Kartlari olustur
+    # Kartlari katman sirasina gore olustur
     cards_html = ""
-    for det_name, count in detector_counts.items():
-        if count == 0:
+    for layer_title, layer_dets in LAYER_ORDER:
+        # Bu katmanda aktif dedektor var mi?
+        layer_active = [d for d in layer_dets if detector_counts.get(d, 0) > 0]
+        if not layer_active:
             continue
-        info = detector_info.get(det_name, {"name": det_name, "icon": "\U0001F50D"})
-        stats = _get_stats(det_name)
-
-        problem_html, method_html, repair_html = _build_detail(det_name, stats)
-
-        # Duzeltme metrikleri
-        if stats and "diff_mean" in stats:
-            pct_affected = stats["count"] / max(total_points, 1) * 100
-            pct_correction = stats["diff_mean"] / max(signal_range, 1) * 100
-            ba_html = f'''
-            <div class="det-metrics">
-              <div class="dm-item">
-                <div class="dm-num">{stats["count"]}</div>
-                <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
-              </div>
-              <div class="dm-item">
-                <div class="dm-num">\u00B1{stats["diff_mean"]:.0f}</div>
-                <div class="dm-label">ort. duzeltme<br>miktari</div>
-              </div>
-              <div class="dm-item">
-                <div class="dm-num">{pct_correction:.1f}%</div>
-                <div class="dm-label">sinyal araligina<br>gore duzeltme</div>
-              </div>
-            </div>
-            <div class="det-stats-row">
-              <span class="dt-item">Min duzeltme: <b>\u00B1{stats["diff_min"]:.0f}</b></span>
-              <span class="dt-item">Max duzeltme: <b>\u00B1{stats["diff_max"]:.0f}</b></span>
-            </div>'''
-        elif stats:
-            pct_affected = stats["count"] / max(total_points, 1) * 100
-            ba_html = f'''
-            <div class="det-metrics">
-              <div class="dm-item">
-                <div class="dm-num">{stats["count"]}</div>
-                <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
-              </div>
-            </div>'''
-        else:
-            ba_html = ''
 
         cards_html += f"""
-        <div class="det-card">
-          <div class="det-header">
-            <span class="det-title">{info["icon"]} {info["name"]}</span>
-            <span class="det-badge">{count} tespit</span>
-          </div>
-          <div class="det-body">
-            <div class="det-block">{problem_html}</div>
-            <div class="det-block det-full">{method_html}</div>
-            {ba_html}
-            {repair_html}
-          </div>
+        <div class="layer-header">
+          <div class="layer-title">{layer_title}</div>
         </div>
         """
+
+        for det_name in layer_active:
+            count = detector_counts[det_name]
+            info = detector_info.get(det_name, {"name": det_name, "icon": "\U0001F50D"})
+            stats = _get_stats(det_name)
+
+            problem_html, method_html, repair_html = _build_detail(det_name, stats)
+
+            # Duzeltme metrikleri
+            if stats and "diff_mean" in stats:
+                pct_affected = stats["count"] / max(total_points, 1) * 100
+                pct_correction = stats["diff_mean"] / max(signal_range, 1) * 100
+                ba_html = f'''
+                <div class="det-metrics">
+                  <div class="dm-item">
+                    <div class="dm-num">{stats["count"]}</div>
+                    <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
+                  </div>
+                  <div class="dm-item">
+                    <div class="dm-num">\u00B1{stats["diff_median"]:.0f}</div>
+                    <div class="dm-label">medyan<br>duzeltme</div>
+                  </div>
+                  <div class="dm-item">
+                    <div class="dm-num">{pct_correction:.1f}%</div>
+                    <div class="dm-label">sinyal araligina<br>gore duzeltme</div>
+                  </div>
+                </div>
+                <div class="det-stats-row">
+                  <span class="dt-item">Min: <b>\u00B1{stats["diff_min"]:.0f}</b></span>
+                  <span class="dt-item">Medyan: <b>\u00B1{stats["diff_median"]:.0f}</b></span>
+                  <span class="dt-item">Max: <b>\u00B1{stats["diff_max"]:.0f}</b></span>
+                </div>'''
+            elif stats:
+                pct_affected = stats["count"] / max(total_points, 1) * 100
+                ba_html = f'''
+                <div class="det-metrics">
+                  <div class="dm-item">
+                    <div class="dm-num">{stats["count"]}</div>
+                    <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
+                  </div>
+                </div>'''
+            else:
+                ba_html = ''
+
+            cards_html += f"""
+            <div class="det-card">
+              <div class="det-header">
+                <span class="det-title">{info["icon"]} {info["name"]}</span>
+                <span class="det-badge">{count} tespit</span>
+              </div>
+              <div class="det-body">
+                <div class="det-block">{problem_html}</div>
+                <div class="det-block det-full">{method_html}</div>
+                {ba_html}
+                {repair_html}
+              </div>
+            </div>
+            """
 
     # Hero + Summary
     total = metrics.get("faults_detected", 0)
     corrected = metrics.get("faults_corrected", total)
     elapsed = metrics.get("processing_time", 0)
     active_count = sum(1 for v in detector_counts.values() if v > 0)
+
+    # Kalite metrikleri (varsa)
+    quality_cards = ""
+    if quality_metrics:
+        rmse = quality_metrics.get("rmse")
+        snr = quality_metrics.get("snr")
+        r2 = quality_metrics.get("r2_score")
+        if rmse is not None:
+            quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{rmse:.2f}</div><div class="stat-label">RMSE</div></div>'
+        if snr is not None:
+            quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{snr:.1f}</div><div class="stat-label">SNR (dB)</div></div>'
+        if r2 is not None:
+            quality_cards += f'<div class="stat-card stat-quality"><div class="stat-num">{r2:.3f}</div><div class="stat-label">R\u00B2</div></div>'
+
+    quality_row = ""
+    if quality_cards:
+        quality_row = f"""
+        <div class="hero-quality-label">Sinyal Kalitesi (Ground Truth)</div>
+        <div class="hero-stats">{quality_cards}</div>
+        """
 
     hero_html = f"""
     <div class="hero">
@@ -306,6 +349,7 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
         <div class="stat-card"><div class="stat-num">{corrected}</div><div class="stat-label">Duzeltme</div></div>
         <div class="stat-card"><div class="stat-num">{elapsed:.1f}s</div><div class="stat-label">Sure</div></div>
       </div>
+      {quality_row}
     </div>
     """
 
@@ -327,6 +371,10 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
     .stat-card{background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:14px 20px;min-width:100px}
     .stat-num{color:#58a6ff;font-size:1.8em;font-weight:700;line-height:1}
     .stat-label{color:#7d8590;font-size:0.75em;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px}
+    .layer-header{margin:28px 0 12px;padding:0 4px}
+    .layer-title{color:#7d8590;font-size:0.8em;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;border-bottom:1px solid #21262d;padding-bottom:8px}
+    .hero-quality-label{color:#7d8590;font-size:0.75em;text-transform:uppercase;letter-spacing:1px;margin-top:16px;margin-bottom:8px}
+    .stat-quality .stat-num{color:#3fb950}
     .det-card{background:#0d1117;border:1px solid #21262d;border-radius:12px;margin-bottom:20px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3)}
     .det-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid #21262d;background:#161b22}
     .det-title{color:#58a6ff;font-size:1.1em;font-weight:600}

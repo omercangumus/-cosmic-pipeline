@@ -563,6 +563,9 @@ def run_pipeline_ui(method, selected_columns):
     tracer_table = result.get("tracer_table", pd.DataFrame())
     tracer_summary = result.get("tracer_summary", "")
 
+    if clean is not None:
+        result["quality_metrics"] = gt_metrics
+
     pipeline_viz_html = _generate_pipeline_animation(result, corrupted)
 
     return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
