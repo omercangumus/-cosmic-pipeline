@@ -37,7 +37,7 @@ theme = gr.themes.Base(
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-with gr.Blocks(title="Cosmic Pipeline") as app:
+with gr.Blocks(title="Cosmic Pipeline", theme=theme) as app:
 
     gr.Markdown("# 🛰️ Kozmik Veri Ayiklama ve Isleme Hatti")
     gr.Markdown("**TUA Astro Hackathon 2026** — Ahmet & Omer")
@@ -178,4 +178,4 @@ with gr.Blocks(title="Cosmic Pipeline") as app:
 
 
 if __name__ == "__main__":
-    app.launch(server_port=7860, share=False, theme=theme)
+    app.launch(server_port=7860, share=False)

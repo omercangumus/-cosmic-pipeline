@@ -366,6 +366,16 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
     </div>
     """
 
+    no_anomaly_html = ""
+    if total == 0:
+        no_anomaly_html = """
+        <div class="summary-card" style="border-color:#58a6ff;margin-bottom:16px">
+          <div class="summary-icon" style="color:#58a6ff">\U0001F50D</div>
+          <div class="summary-title" style="color:#58a6ff">Anomali Bulunamadi</div>
+          <div class="summary-stats">Veri temiz gorunuyor \u2014 7 dedektor tarafından tarandi, hicbir anomali tespit edilmedi</div>
+        </div>
+        """
+
     summary_html = f"""
     <div class="summary-card">
       <div class="summary-icon">\u2713</div>
@@ -418,4 +428,4 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
     </style>
     """
 
-    return f'{css}<div class="pipeline-viz">{hero_html}{cards_html}{summary_html}</div>'
+    return f'{css}<div class="pipeline-viz">{hero_html}{cards_html}{no_anomaly_html}{summary_html}</div>'
