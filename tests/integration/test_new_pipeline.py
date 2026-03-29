@@ -26,8 +26,8 @@ class TestMercekFilterPipeline:
             corrupted, mask, return_intermediates=True,
         )
         assert "step_0_raw" in intermediates
-        assert "step_1_interpolated" in intermediates
-        assert "step_2_detrended" in intermediates
+        assert "step_1_nan" in intermediates
+        assert "step_2_interpolated" in intermediates
         assert "step_3_median" in intermediates
 
     def test_each_step_changes_signal(self):
@@ -38,10 +38,10 @@ class TestMercekFilterPipeline:
         )
         # Each step should differ from the previous
         assert not np.array_equal(
-            intermediates["step_0_raw"], intermediates["step_1_interpolated"],
+            intermediates["step_0_raw"], intermediates["step_1_nan"],
         )
         assert not np.array_equal(
-            intermediates["step_1_interpolated"], intermediates["step_2_detrended"],
+            intermediates["step_1_nan"], intermediates["step_2_interpolated"],
         )
 
     def test_detrend_reduces_trend(self):

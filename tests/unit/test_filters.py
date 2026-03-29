@@ -155,8 +155,8 @@ def test_apply_classic_return_intermediates():
     result, intermediates = apply_classic_filters(df, mask, return_intermediates=True)
     assert isinstance(result, pd.DataFrame)
     assert "step_0_raw" in intermediates
-    assert "step_1_interpolated" in intermediates
-    assert "step_2_detrended" in intermediates
+    assert "step_1_nan" in intermediates
+    assert "step_2_interpolated" in intermediates
     assert "step_3_median" in intermediates
 
 

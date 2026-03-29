@@ -108,9 +108,9 @@ def apply_classic_filters(
     Layered repair — only anomalous points are modified.
 
     Steps:
-      1. Interpolate NaN gaps at fault positions.
-      2. Detrend: compute on full signal, apply only to fault points.
-      3. Median filter: compute on full signal, apply only to fault points.
+      1. Set fault points to NaN.
+      2. Interpolate from clean neighbors.
+      3. Median filter on fault points only (spike smoothing).
 
     Clean points (mask == False) are NEVER modified.
 
@@ -129,31 +129,41 @@ def apply_classic_filters(
     intermediates: dict[str, np.ndarray] = {}
     intermediates["step_0_raw"] = original_clean.copy()
 
-    # Step 1: Interpolate NaN gaps (only NaN positions)
+    # Step 1: Set ALL fault points to NaN (including existing NaN gaps)
     nan_mask = result["value"].isna()
-    if nan_mask.any():
-        result = interpolate_gaps(result, nan_mask)
-    intermediates["step_1_interpolated"] = result["value"].values.copy()
+    all_bad = mask | nan_mask
 
-    # Step 2: Detrend — compute on full signal, apply only to fault points
-    if mask.any():
-        detrended = detrend_signal(result)
-        result.loc[mask, "value"] = detrended.loc[mask, "value"]
-    intermediates["step_2_detrended"] = result["value"].values.copy()
+    values = result["value"].values.astype(np.float64)
+    values[all_bad.values] = np.nan
+    result["value"] = values
+    intermediates["step_1_nan"] = result["value"].values.copy()
+
+    # Step 2: Interpolate from clean neighbors
+    result["value"] = result["value"].interpolate(method="linear", limit_direction="both")
+    result["value"] = result["value"].ffill().bfill()
+    intermediates["step_2_interpolated"] = result["value"].values.copy()
 
     # Step 3: Median filter — compute on full signal, apply only to fault points
-    if mask.any():
-        filtered = median_filter(result, window=median_window)
-        result.loc[mask, "value"] = filtered.loc[mask, "value"]
+    if mask.any() and median_window > 1:
+        filtered_values = result["value"].values.astype(np.float64).copy()
+        if median_window % 2 == 0:
+            median_window += 1
+        med_result = _medfilt(filtered_values, size=median_window)
+        result_values = result["value"].values.copy()
+        result_values[mask.values] = med_result[mask.values]
+        result["value"] = result_values
     intermediates["step_3_median"] = result["value"].values.copy()
 
     # Guarantee: clean points with original finite values stay untouched
     clean_finite = ~mask & np.isfinite(original_clean)
     result.loc[clean_finite, "value"] = original_clean[clean_finite]
 
+    n_nan = int(nan_mask.sum())
+    n_fault = int(mask.sum())
+    n_clean = int(clean_finite.sum())
     logger.info(
         "Classic filter pipeline complete: %d gaps filled, %d fault points repaired, %d clean preserved",
-        int(nan_mask.sum()), int(mask.sum()), int(clean_finite.sum()),
+        n_nan, n_fault, n_clean,
     )
 
     if return_intermediates:
