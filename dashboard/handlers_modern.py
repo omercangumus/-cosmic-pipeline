@@ -22,6 +22,9 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
     delta_mean = float(np.nanmean(finite_deltas)) if len(finite_deltas) > 1 else 0
     delta_std = float(np.nanstd(finite_deltas)) if len(finite_deltas) > 1 else 1
 
+    total_points = len(corrupted_df)
+    signal_range = float(np.nanmax(finite) - np.nanmin(finite)) if len(finite) > 1 else 1
+
     # Default thresholds (from detect_all defaults)
     THRESHOLDS = {
         "zscore": {"threshold": 2.0},
@@ -237,35 +240,40 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
 
         problem_html, method_html, repair_html = _build_detail(det_name, stats)
 
-        # Istatistik bazli before/after
-        if stats and "cln_mean" in stats:
+        # Duzeltme metrikleri
+        if stats and "diff_mean" in stats:
+            pct_affected = stats["count"] / max(total_points, 1) * 100
+            pct_correction = stats["diff_mean"] / max(signal_range, 1) * 100
             ba_html = f'''
-            <div class="det-ba">
-              <div class="ba-side">
-                <div class="ba-label">ORT. BOZUK</div>
-                <div class="ba-before">{stats["cor_mean"]:.1f}</div>
+            <div class="det-metrics">
+              <div class="dm-item">
+                <div class="dm-num">{stats["count"]}</div>
+                <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
               </div>
-              <span class="ba-arrow">\u2192</span>
-              <div class="ba-side">
-                <div class="ba-label">ORT. TEMIZ</div>
-                <div class="ba-after">{stats["cln_mean"]:.1f}</div>
+              <div class="dm-item">
+                <div class="dm-num">\u00B1{stats["diff_mean"]:.0f}</div>
+                <div class="dm-label">ort. duzeltme<br>miktari</div>
+              </div>
+              <div class="dm-item">
+                <div class="dm-num">{pct_correction:.1f}%</div>
+                <div class="dm-label">sinyal araligina<br>gore duzeltme</div>
               </div>
             </div>
             <div class="det-stats-row">
-              <span class="dt-item">Ort. duzeltme: <b>{stats["diff_mean"]:.1f}</b></span>
-              <span class="dt-item">Min: <b>{stats["diff_min"]:.1f}</b></span>
-              <span class="dt-item">Max: <b>{stats["diff_max"]:.1f}</b></span>
+              <span class="dt-item">Min duzeltme: <b>\u00B1{stats["diff_min"]:.0f}</b></span>
+              <span class="dt-item">Max duzeltme: <b>\u00B1{stats["diff_max"]:.0f}</b></span>
             </div>'''
         elif stats:
+            pct_affected = stats["count"] / max(total_points, 1) * 100
             ba_html = f'''
-            <div class="det-ba">
-              <div class="ba-side">
-                <div class="ba-label">ORT. DEGER</div>
-                <div class="ba-before">{stats["cor_mean"]:.1f}</div>
+            <div class="det-metrics">
+              <div class="dm-item">
+                <div class="dm-num">{stats["count"]}</div>
+                <div class="dm-label">anomali<br>({pct_affected:.1f}%)</div>
               </div>
             </div>'''
         else:
-            ba_html = '<div class="det-value">Istatistik hesaplanamadi</div>'
+            ba_html = ''
 
         cards_html += f"""
         <div class="det-card">
@@ -335,12 +343,10 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
     .dt-item b{color:#c9d1d9}
     .det-formula{font-family:'JetBrains Mono',monospace;font-size:0.95em;color:#d2a8ff;background:#0d1117;padding:6px 10px;border-radius:4px;margin:4px 0}
     .det-formula b{color:#f0883e}
-    .det-ba{display:flex;align-items:center;justify-content:center;gap:24px;padding:20px;background:#161b22;border-radius:8px}
-    .ba-side{text-align:center}
-    .ba-label{color:#7d8590;font-size:0.7em;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
-    .ba-before{color:#ef4444;font-size:2.5em;font-weight:700;line-height:1}
-    .ba-arrow{color:#58a6ff;font-size:1.5em}
-    .ba-after{color:#3fb950;font-size:2.5em;font-weight:700;line-height:1}
+    .det-metrics{display:flex;justify-content:center;gap:32px;padding:16px;background:#161b22;border-radius:8px}
+    .dm-item{text-align:center}
+    .dm-num{color:#58a6ff;font-size:1.8em;font-weight:700;line-height:1}
+    .dm-label{color:#7d8590;font-size:0.7em;text-transform:uppercase;letter-spacing:0.3px;margin-top:4px;line-height:1.3}
     .det-repair{color:#7d8590;font-size:0.85em;font-style:italic;text-align:center;padding:4px}
     .det-stats-row{display:flex;gap:16px;justify-content:center;color:#8b949e;font-size:0.85em;padding:4px 0}
     .det-stats-row b{color:#c9d1d9}
