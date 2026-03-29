@@ -69,9 +69,7 @@ canvas{display:block}
 #mmc{width:130px;height:130px}
 #ch{position:absolute;bottom:28px;left:10px;color:#333;font-size:9px}
 .ft{position:absolute;pointer-events:none;font-size:16px;font-weight:bold;color:#00ff88;text-shadow:0 0 6px #00ff88;opacity:0;transition:opacity .3s,top .7s}
-#done-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;display:none;pointer-events:auto;cursor:pointer;z-index:100}
-#done-overlay h1{color:#00ff88;font-size:28px;text-shadow:0 0 20px #00ff88}
-#done-overlay canvas{display:block;margin:8px auto;border-radius:4px}
+
 </style>
 </head>
 <body>
@@ -112,7 +110,6 @@ canvas{display:block}
 </div>
 <div id="mm"><canvas id="mmc" width="130" height="130"></canvas></div>
 <div id="ch">WASD Hareket | SHIFT Kos | SPACE Etkilesim | Fare Bakis</div>
-<div id="done-overlay"><h1></h1><canvas width="200" height="50"></canvas><br><button id="done-btn" style="margin-top:10px;background:linear-gradient(135deg,#00ff88,#00aa55);border:none;color:#0a0e17;padding:8px 24px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:bold;font-family:inherit;">Devam Et &#x25B6;</button></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -143,7 +140,7 @@ var stg=1,mi=0,score=0,mAct=false,tgts=[],coll=0,tCnt=0;
 var pR=null,phase='idle',mStart=0,nearT=false;
 var rBeacon=null,mPh='none',shiftD=false;
 var flyAct=false,flyT=0,flyFrom=null,flyTo=null;
-var bursts=[],confetti=[];
+var bursts=[];
 
 /* ============ THREE ============ */
 var sc=new THREE.Scene();
@@ -367,14 +364,6 @@ function showFloat(txt,x,y){
   setTimeout(function(){el.style.opacity='0';},500);
   setTimeout(function(){el.remove();},900);
 }
-function spawnConfetti(){
-  confetti.forEach(function(c){sc.remove(c)});confetti.length=0;
-  var cols=[0xff4444,0xf59e0b,0x00ff88,0x3b82f6,0x8b5cf6,0x00d4ff,0xffffff];
-  for(var i=0;i<16;i++){var c=box(.15,.15,.15,cols[i%cols.length],cols[i%cols.length],0.85);
-    c.position.set(player.position.x+(Math.random()-.5)*6,6+Math.random()*3,player.position.z+(Math.random()-.5)*6);
-    c.userData.conf=true;c.userData.vy=-(2+Math.random()*3);c.userData.life=2;sc.add(c);confetti.push(c);}
-}
-
 /* ============ DATA VIS CANVAS ============ */
 function drawDataVis(){
   var cv=document.getElementById('dv-canvas'),cx=cv.getContext('2d');
@@ -389,19 +378,12 @@ function drawDataVis(){
   for(var x2=160;x2<280;x2++){var y2=30+Math.sin((x2-160)*.08)*10;if(x2===160)cx.moveTo(x2,y2);else cx.lineTo(x2,y2);}cx.stroke();
 }
 
-function drawDoneVis(){
-  var ov=document.getElementById('done-overlay'),cv=ov.querySelector('canvas'),cx=cv.getContext('2d');
-  cx.fillStyle='#0a1520';cx.fillRect(0,0,200,50);
-  cx.strokeStyle='#00ff88';cx.lineWidth=2;cx.beginPath();
-  for(var x=0;x<200;x++){var y=25+Math.sin(x*.06)*12;if(x===0)cx.moveTo(x,y);else cx.lineTo(x,y);}cx.stroke();
-}
-
 /* ============ INPUT ============ */
 var keys={};
 document.addEventListener('keydown',function(e){keys[e.key.toLowerCase()]=true;if(e.key==='Shift')shiftD=true;if(e.code==='Space'){e.preventDefault();doInteract();}});
 document.addEventListener('keyup',function(e){keys[e.key.toLowerCase()]=false;if(e.key==='Shift')shiftD=false;});
 document.addEventListener('mousemove',function(e){if(document.pointerLockElement)pAng-=e.movementX*0.003;});
-ren.domElement.addEventListener('click',function(){if(mAct&&document.getElementById('done-overlay').style.display!=='block'&&document.getElementById('mp').style.display!=='block')ren.domElement.requestPointerLock();});
+ren.domElement.addEventListener('click',function(){if(mAct&&document.getElementById('mp').style.display!=='block')ren.domElement.requestPointerLock();});
 
 /* ============ GUIDE (persistent) ============ */
 function setGuide(txt){document.getElementById('guide').textContent=txt;document.getElementById('guide').style.opacity='1';}
@@ -528,54 +510,37 @@ function beginMission(m){
 
 function completeMission(){
   mAct=false;mPh='none';phase='complete';removeRB();
-  if(document.pointerLockElement)document.exitPointerLock();
+  try{document.exitPointerLock();}catch(e){}
   var ms=getMs(),m=ms[mi];var elapsed=(performance.now()-mStart)/1000;
   var bonus=elapsed<30?Math.floor(m.rew*.5):0,pts=m.rew+bonus;
   score+=pts;
   document.getElementById('hSc').textContent=score;
   console.log('[completeMission] score='+score+' pts='+pts+' mi='+mi+' stg='+stg);
-
-  // Done overlay
-  var ov=document.getElementById('done-overlay');
-  ov.querySelector('h1').textContent='\u2705 '+m.dt;
-  drawDoneVis();
-  ov.style.display='block';
-  try{document.exitPointerLock();}catch(e){}
-  console.log('[completeMission] overlay shown');
-  spawnConfetti();
-  setGuide('\u{1F3C6} Gorev tamamlandi! +'+pts+' puan!'+(bonus>0?' (hiz +'+bonus+')':''));
-
-  // Progress dots
   document.getElementById('d'+(stg-1)*4+mi).className='dot dn';
   mi++;
   if(mi<ms.length)document.getElementById('d'+(stg-1)*4+mi).className='dot ac';
   clearTgts();
+  setGuide('\u{1F3C6} '+m.dt+' +'+pts+' puan!'+(bonus>0?' (hiz +'+bonus+')':''));
   console.log('[completeMission] mi now='+mi+' total='+ms.length);
-
-  var _pts=pts,_bonus=bonus,_score=score,_mi=mi,_msLen=ms.length,_dt=m.dt;
-  document.getElementById('done-btn').addEventListener('mousedown',function(e){e.stopPropagation();});
-  document.getElementById('done-btn').onclick=function(){
-    ov.style.display='none';
-    if(_mi>=_msLen){
-      stageDone();
-    } else {
-      var p=document.getElementById('mp');
-      document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
-      document.getElementById('md').textContent=_dt;
-      document.getElementById('dv-canvas').style.display='none';
-      document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
-      document.getElementById('prl').innerHTML='';
-      document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
-      document.getElementById('mo').textContent='Sonraki gorev hazir';
-      document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
-      document.getElementById('mb').onclick=function(){
-        p.style.display='none';
-        document.getElementById('dv-canvas').style.display='block';
-        startNext();
-      };
-      p.style.display='block';
-    }
-  };
+  var _mi=mi,_msLen=ms.length,_pts=pts,_bonus=bonus,_score=score,_dt=m.dt;
+  setTimeout(function(){
+    if(_mi>=_msLen){stageDone();return;}
+    var p=document.getElementById('mp');
+    document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
+    document.getElementById('md').textContent=_dt;
+    document.getElementById('dv-canvas').style.display='none';
+    document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
+    document.getElementById('prl').innerHTML='';
+    document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
+    document.getElementById('mo').textContent='Sonraki gorev hazir';
+    document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
+    document.getElementById('mb').onclick=function(){
+      p.style.display='none';
+      document.getElementById('dv-canvas').style.display='block';
+      startNext();
+    };
+    p.style.display='block';
+  },1000);
 }
 
 function stageDone(){
@@ -641,7 +606,6 @@ function animate(){
   document.getElementById('ih').style.display=nearT?'block':'none';
 
   for(var bi=bursts.length-1;bi>=0;bi--){var b=bursts[bi];b.userData.life-=dt;if(b.userData.life<=0){sc.remove(b);bursts.splice(bi,1);continue;}b.position.add(b.userData.vel.clone().multiplyScalar(dt));b.userData.vel.y-=10*dt;b.material.opacity=b.userData.life;}
-  for(var ci=confetti.length-1;ci>=0;ci--){var c=confetti[ci];c.userData.life-=dt;if(c.userData.life<=0){sc.remove(c);confetti.splice(ci,1);continue;}c.position.y+=c.userData.vy*dt;c.rotation.x+=dt*3;c.rotation.z+=dt*2;c.material.opacity=Math.min(c.userData.life,1);}
 
   ptcl.forEach(function(p){
     if(p.userData.rain){p.position.y-=p.userData.vy*dt;if(p.position.y<0)p.position.y=7;}
