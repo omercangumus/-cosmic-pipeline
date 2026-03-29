@@ -40,16 +40,16 @@ canvas{display:block}
 #cact{color:#00ff88;font-size:12px;font-weight:bold;display:none;animation:pu 1s infinite}
 #mp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,12,25,.96);border:2px solid #00d4ff;border-radius:12px;max-width:500px;width:92%;box-shadow:0 0 40px rgba(0,212,255,.12);display:none;overflow:hidden}
 #mph{background:rgba(0,40,70,.4);padding:14px;border-bottom:1px solid #1a3a5a;text-align:center}
-#mph h2{color:#00d4ff;font-size:17px;margin-bottom:3px}
-#mph .dc{color:#8bb8d4;font-size:11px}
+#mph h2{color:#00d4ff;font-size:26px;margin-bottom:5px}
+#mph .dc{color:#8bb8d4;font-size:16px}
 #mpb{padding:14px;text-align:center}
-#mpb .obj{color:#f59e0b;font-size:12px;margin:8px 0;font-weight:bold}
-#mpb button{background:linear-gradient(135deg,#00d4ff,#0088aa);border:none;color:#fff;padding:9px 28px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;margin-top:5px;transition:transform .2s}
+#mpb .obj{color:#f59e0b;font-size:18px;margin:10px 0;font-weight:bold}
+#mpb button{background:linear-gradient(135deg,#00d4ff,#0088aa);border:none;color:#fff;padding:12px 32px;border-radius:6px;cursor:pointer;font-size:18px;font-family:inherit;margin-top:8px;transition:transform .2s}
 #mpb button:hover{transform:scale(1.05)}
 #prp{background:rgba(0,30,50,.5);border-radius:7px;padding:10px;margin:8px 0;text-align:left;font-size:10px}
-.prt{color:#00d4ff;font-size:10px;font-weight:bold;margin-bottom:4px}
-.pr{display:flex;justify-content:space-between;color:#8bb8d4;margin:1px 0}
-.pv{color:#00ff88}
+.prt{color:#00d4ff;font-size:14px;font-weight:bold;margin-bottom:6px}
+.pr{display:flex;justify-content:space-between;color:#8bb8d4;margin:2px 0;font-size:14px}
+.pv{color:#00ff88;font-size:14px}
 #dv-canvas{display:block;margin:6px auto;border-radius:4px;border:1px solid #1a3a5a}
 #po{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,10,20,.96);border:2px solid #f59e0b;border-radius:12px;padding:18px 24px;text-align:center;min-width:320px;display:none}
 #po h3{color:#f59e0b;margin-bottom:8px;font-size:14px}
@@ -515,31 +515,36 @@ function completeMission(){
   var bonus=elapsed<30?Math.floor(m.rew*.5):0,pts=m.rew+bonus;
   score+=pts;
   document.getElementById('hSc').textContent=score;
-  console.log('[completeMission] score='+score+' pts='+pts+' mi='+mi+' stg='+stg);
   document.getElementById('d'+(stg-1)*4+mi).className='dot dn';
   mi++;
   if(mi<ms.length)document.getElementById('d'+(stg-1)*4+mi).className='dot ac';
   clearTgts();
-  setGuide('\u{1F3C6} '+m.dt+' +'+pts+' puan!'+(bonus>0?' (hiz +'+bonus+')':''));
-  console.log('[completeMission] mi now='+mi+' total='+ms.length);
-  var _mi=mi,_msLen=ms.length,_pts=pts,_bonus=bonus,_score=score,_dt=m.dt;
-  setTimeout(function(){
-    if(_mi>=_msLen){stageDone();return;}
-    var p=document.getElementById('mp');
-    document.getElementById('mt').textContent='\u2705 GOREV TAMAMLANDI!';
-    document.getElementById('md').textContent=_dt;
-    document.getElementById('dv-canvas').style.display='none';
-    document.getElementById('prd').innerHTML='<div class="pr"><span>Puan</span><span class="pv">+'+_pts+(_bonus>0?' (hiz +'+_bonus+')':'')+'</span></div>';
-    document.getElementById('prl').innerHTML='';
-    document.getElementById('prs').innerHTML='<div class="pr"><span>Toplam</span><span class="pv">'+_score+'</span></div>';
-    document.getElementById('mo').textContent='Sonraki gorev hazir';
-    document.getElementById('mb').textContent='\u25B6 SONRAKI GOREV';
-    document.getElementById('mb').onclick=function(){
-      p.style.display='none';
-      document.getElementById('dv-canvas').style.display='block';
-      startNext();
-    };
-    p.style.display='block';
+
+  var cd=document.createElement('div');
+  cd.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;pointer-events:none;background:rgba(10,14,23,0.7)';
+  var title=document.createElement('div');
+  title.textContent='\u2705 '+m.dt;
+  title.style.cssText='color:#00ff88;font-size:36px;font-weight:bold;text-shadow:0 0 30px #00ff88;margin-bottom:8px';
+  var ptsEl=document.createElement('div');
+  ptsEl.textContent='+'+pts+' puan'+(bonus>0?' (hiz +'+bonus+')':'');
+  ptsEl.style.cssText='color:#f59e0b;font-size:24px;font-weight:bold;text-shadow:0 0 20px #f59e0b;margin-bottom:24px';
+  var num=document.createElement('div');
+  num.style.cssText='color:#00d4ff;font-size:96px;font-weight:bold;text-shadow:0 0 40px #00d4ff;transition:transform 0.3s,opacity 0.3s';
+  num.textContent='3';
+  cd.appendChild(title);cd.appendChild(ptsEl);cd.appendChild(num);
+  document.getElementById('ui').appendChild(cd);
+
+  var _mi=mi,_msLen=ms.length,count=3;
+  var iv=setInterval(function(){
+    count--;
+    if(count>0){
+      num.style.transform='scale(1.3)';num.style.opacity='0.5';
+      setTimeout(function(){num.textContent=count;num.style.transform='scale(1)';num.style.opacity='1';},150);
+    } else {
+      clearInterval(iv);
+      cd.remove();
+      if(_mi>=_msLen){stageDone();}else{startNext();}
+    }
   },1000);
 }
 
