@@ -14,7 +14,8 @@ Uzay ortamında uydu sensörleri kozmik radyasyona maruz kalır. Bu radyasyon te
 
 Sistem dual-track mimarisiyle çalışır: klasik sinyal işleme (DSP) teknikleri ile makine öğrenimi/derin öğrenme modellerini bir arada kullanarak yüksek doğruluklu anomali tespiti ve onarım gerçekleştirir.
 
-![Veri Önizleme](sunum_assets/ss1_veri.png)
+![Veri Önizleme](<img width="1646" height="1255" alt="image" src="https://github.com/user-attachments/assets/517d81a5-5fae-4c1c-aba6-14a32c42d9bc" />
+)
 
 ---
 
@@ -58,7 +59,9 @@ Veri Alımı → Ön İşleme (Detrend) → Anomali Tespiti (7 Dedektör) → En
 ### Katman 4 — Derin Öğrenme
 - **LSTM Autoencoder:** Zaman serisi paternlerini öğrenir, reconstruction error yüksek → anomali
 
-![Dedektör Detayı](sunum_assets/ss3_dedektor.png)
+![Dedektör Detayı](<img width="2211" height="613" alt="image" src="https://github.com/user-attachments/assets/2dc62669-a2cd-442e-9193-2ff4ce08de44" />
+
+)
 
 ---
 
@@ -78,13 +81,9 @@ Sentetik veri üretimi (NOAA GOES-16 profilleri) veya gerçek CSV/TSV/Excel/JSON
 - 🔍 **Doğrulama:** Onarım doğrulama sonuçları
 - 🔬 **Adım Adım İzleme:** Pipeline tracer tablosu
 
-![Pipeline Sonucu](sunum_assets/ss2_sonuc.png)
 
-![Pipeline Görselleştirme](sunum_assets/ss4_hero.png)
-
-![Katman 1 Kartları](sunum_assets/ss7_katman1_ust.png)
-
-![ML + DL Kartları](sunum_assets/ss6_katman34.png)
+![Pipeline Görselleştirme](<img width="302" height="1097" alt="image" src="https://github.com/user-attachments/assets/7c8438cc-4083-496f-a775-73c3affd56ce" />
+)
 
 ---
 
@@ -99,7 +98,8 @@ Three.js tabanlı 3D eğitici oyun:
 - WASD + mouse kontrol, görev briefing paneli
 - 3-2-1 countdown otomatik geçiş
 
-![DataCraft v5](sunum_assets/ss9_game.png)
+![DataCraft v5](<img width="2519" height="1679" alt="image" src="https://github.com/user-attachments/assets/27199b42-08b7-425d-9f1e-9b4e693c6bde" />
+)
 
 ---
 
