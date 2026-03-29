@@ -260,7 +260,7 @@ def upload_csv(file):
         except Exception:
             pass
 
-        time_aliases = {"timestamp", "time_tag", "date", "datetime", "time", "ds"}
+        time_aliases = {"timestamp", "Timestamp", "time_tag", "date", "datetime", "time", "ds", "Time"}
         numeric_cols = []
         if raw_df is not None:
             numeric_cols = [
@@ -432,7 +432,8 @@ def run_pipeline_ui(method, selected_columns):
                 for name in _PIPELINE_LOGGERS:
                     logging.getLogger(name).removeHandler(handler)
         except Exception as e:
-            return "", None, _user_friendly_error(e), None, "", None, "", None, ""
+            logging.getLogger(__name__).exception("Multi-channel pipeline error")
+            return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
 
         summary = multi_result["summary"]
         channels = multi_result["channels"]
@@ -500,7 +501,7 @@ def run_pipeline_ui(method, selected_columns):
 
         pipeline_viz_html = ""
         if first_valid:
-            corrupted_for_viz = _state.get("corrupted", corrupted)
+            corrupted_for_viz = _state.get("corrupted")
             pipeline_viz_html = _generate_pipeline_animation(first_valid, corrupted_for_viz)
 
         return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
@@ -518,7 +519,8 @@ def run_pipeline_ui(method, selected_columns):
     try:
         result, logs = _run_with_logs(corrupted, method)
     except Exception as e:
-        return "", None, _user_friendly_error(e), None, "", None, "", None, ""
+        logging.getLogger(__name__).exception("Single-channel pipeline error")
+        return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
 
     _state["result"] = result
     _state["method"] = method
