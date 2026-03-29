@@ -4,8 +4,6 @@ AI-Powered Satellite Telemetry Anomaly Detection & Repair
 
 **TUA Astro Hackathon 2026** — Fırat Üniversitesi, Elazığ
 
-**Takım:** Ahmed Hüsrev Sayın · Ömer Can Gümüş · Yunus Emre Dertli
-
 ---
 
 ## 📋 Proje Özeti
