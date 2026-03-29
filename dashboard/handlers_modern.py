@@ -59,19 +59,59 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
                 return str(ts_val)
 
     def _get_example(det_name):
-        """fault_timeline'dan bu dedektorun ornek anomalisini bul."""
+        """fault_timeline'dan bu dedektorun en anlamli ornek anomalisini bul."""
         if fault_timeline is None or fault_timeline.empty:
             return None
         matches = fault_timeline[fault_timeline["fault_type"].str.contains(det_name, na=False)]
         if matches.empty:
             return None
-        row = matches.iloc[0]
-        ts = row["timestamp"]
-        diffs = (corrupted_df["timestamp"] - ts).abs()
-        idx = diffs.idxmin()
-        cor_val = float(corrupted_df.loc[idx, "value"])
-        cln_val = float(cleaned.loc[idx, "value"]) if cleaned is not None else None
-        return {"ts": ts, "idx": idx, "cor": cor_val, "cln": cln_val}
+
+        # Severity'ye gore sirala, en yuksekten basla
+        matches_sorted = matches.sort_values("severity", ascending=False)
+
+        best = None
+        best_ratio = float("inf")
+
+        for _, row in matches_sorted.head(10).iterrows():
+            ts = row["timestamp"]
+            try:
+                diffs = (corrupted_df["timestamp"] - ts).abs()
+                idx = diffs.idxmin()
+                cor_val = float(corrupted_df.loc[idx, "value"])
+                cln_val = float(cleaned.loc[idx, "value"]) if cleaned is not None else None
+
+                # NaN kontrolu
+                if np.isnan(cor_val) or (cln_val is not None and np.isnan(cln_val)):
+                    continue
+
+                # Mantik kontrolu: temiz deger bozuktan cok farkli olmamali
+                if cln_val is not None and cor_val != 0:
+                    ratio = abs(cln_val - cor_val) / max(abs(cor_val), 1)
+                    # Ideal: bozuk deger duzeltilmis ama makul aralikta
+                    if ratio < best_ratio and ratio < 10:
+                        best = {"ts": ts, "idx": idx, "cor": cor_val, "cln": cln_val}
+                        best_ratio = ratio
+                        if ratio < 2:  # Yeterince iyi, dur
+                            break
+                elif best is None:
+                    best = {"ts": ts, "idx": idx, "cor": cor_val, "cln": cln_val}
+            except Exception:
+                continue
+
+        # Hic mantikli bulamadiysa en yuksek severity olani al
+        if best is None and not matches_sorted.empty:
+            row = matches_sorted.iloc[0]
+            ts = row["timestamp"]
+            try:
+                diffs = (corrupted_df["timestamp"] - ts).abs()
+                idx = diffs.idxmin()
+                cor_val = float(corrupted_df.loc[idx, "value"])
+                cln_val = float(cleaned.loc[idx, "value"]) if cleaned is not None else None
+                best = {"ts": ts, "idx": idx, "cor": cor_val, "cln": cln_val}
+            except Exception:
+                return None
+
+        return best
 
     def _build_detail(det_name, ex):
         """Dedektore ozel detay HTML uret."""
@@ -206,9 +246,8 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
                     <span class="dt-item">Model: <b>Isolation Forest</b></span>
                     <span class="dt-item det-red">Bu nokta normal veri dagilimina uymuyor</span>
                 </div>'''
-            method = '''<div class="det-label">\U0001F50D NASIL YAKALANDI</div>
-                <div class="det-formula">Izolasyon derinligi normalden dusuk</div>
-                <div class="det-value det-blue">Anomali skoru esik degerini asti</div>'''
+            method = f'''<div class="det-label">\U0001F50D NASIL YAKALANDI</div>
+                <div class="det-value det-blue">Veri noktasi rastgele bolunmelerle hizla izole edilebildi \u2014 normal veriden farkli dagilim gosteriyor</div>'''
             repair = "Komsu degerlerin ortalamasi ile duzeltildi"
 
         elif det_name == "lstm_ae":
@@ -216,11 +255,10 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
                 <div class="det-value det-red">Temporal pattern anomali</div>
                 <div class="det-detail">
                     <span class="dt-item">Model: <b>LSTM Autoencoder</b></span>
-                    <span class="dt-item det-red">Zaman serisi paterni beklentiden sapti</span>
+                    <span class="dt-item det-red">Gecmis veriden ogrenen model bu noktayi tahmin edemedi</span>
                 </div>'''
-            method = '''<div class="det-label">\U0001F50D NASIL YAKALANDI</div>
-                <div class="det-formula">Reconstruction error esik degerini asti</div>
-                <div class="det-value det-blue">Temporal baglam anomalisi</div>'''
+            method = f'''<div class="det-label">\U0001F50D NASIL YAKALANDI</div>
+                <div class="det-value det-blue">Model sinyali yeniden uretmeye calisti, bu noktadaki hata (reconstruction error) diger noktalara gore cok yuksek</div>'''
             repair = "Model tahmini ile duzeltildi"
 
         else:
@@ -248,6 +286,13 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
 
         problem_html, method_html, repair_html = _build_detail(det_name, ex)
 
+        # Mantik uyarisi
+        ba_warning = ""
+        if ex and ex["cor"] is not None and ex["cln"] is not None:
+            ratio = abs(ex["cln"] - ex["cor"]) / max(abs(ex["cor"]), 1)
+            if ratio > 5:
+                ba_warning = '<div class="det-repair det-red" style="font-style:normal">\u26A0\uFE0F Bu ornek asiri bozulmus \u2014 tipik duzeltmeler daha kucuk farklar icerir</div>'
+
         cards_html += f"""
         <div class="det-card">
           <div class="det-header">
@@ -272,6 +317,7 @@ def _generate_pipeline_animation(result: dict, corrupted_df) -> str:
                 <div class="ba-after">{cln_str}</div>
               </div>
             </div>
+            {ba_warning}
             {repair_html}
           </div>
         </div>
