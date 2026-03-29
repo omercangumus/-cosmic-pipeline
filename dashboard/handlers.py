@@ -508,7 +508,20 @@ def run_pipeline_ui(method, selected_columns):
             corrupted_for_viz = _state.get("corrupted")
             pipeline_viz_html = _generate_pipeline_animation(first_valid, corrupted_for_viz)
 
-        cleaned_table = first_valid["cleaned_data"].head(50) if first_valid and "cleaned_data" in first_valid else None
+        # Tum kanallarin temizlenmis halini birlestir
+        cleaned_table = None
+        if channels:
+            cleaned_parts = {}
+            for col, res in channels.items():
+                if "error" not in res and "cleaned_data" in res:
+                    cleaned_parts[col] = res["cleaned_data"]["value"].values
+            if cleaned_parts:
+                first_ch = next(iter(channels.values()))
+                if "cleaned_data" in first_ch:
+                    combined = pd.DataFrame({"timestamp": first_ch["cleaned_data"]["timestamp"].values})
+                    for col_name, col_values in cleaned_parts.items():
+                        combined[col_name] = col_values
+                    cleaned_table = combined.head(50)
 
         return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary, cleaned_table
 
