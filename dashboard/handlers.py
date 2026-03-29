@@ -261,11 +261,15 @@ def upload_csv(file):
             pass
 
         time_aliases = {"timestamp", "Timestamp", "time_tag", "date", "datetime", "time", "ds", "Time"}
+        _INDEX_ALIASES = {"#", "index", "row", "id", "unnamed", "no", "num", "sira", "row_number"}
         numeric_cols = []
         if raw_df is not None:
             numeric_cols = [
                 c for c in raw_df.select_dtypes(include=["number"]).columns
-                if c.lower() not in time_aliases and c != "label"
+                if c.lower() not in time_aliases
+                and c != "label"
+                and c.lower().strip() not in _INDEX_ALIASES
+                and not c.lower().startswith("unnamed")
             ]
 
         if len(numeric_cols) > 1:
