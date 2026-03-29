@@ -1,104 +1,173 @@
-# Cosmic Pipeline
+# 🛰️ Kozmik Veri Ayıklama ve İşleme Hattı
 
-> TUA Astro Hackathon 2026 | Radyasyonla bozulmus uydu telemetrisini temizleyen hibrit DSP + ML pipeline
+AI-Powered Satellite Telemetry Anomaly Detection & Repair
 
-## Quickstart
+**TUA Astro Hackathon 2026** — Fırat Üniversitesi, Elazığ
+
+**Takım:** Ahmed Hüsrev Sayın · Ömer Can Gümüş · Yunus Emre Dertli
+
+---
+
+## 📋 Proje Özeti
+
+Uzay ortamında uydu sensörleri kozmik radyasyona maruz kalır. Bu radyasyon telemetri verilerinde SEU (bit-flip), TID drift, veri boşlukları ve sensör donmaları oluşturur. Bu proje, bozulan uydu telemetri verilerini otomatik olarak tespit edip onaran bir veri işleme pipeline'ıdır.
+
+Sistem dual-track mimarisiyle çalışır: klasik sinyal işleme (DSP) teknikleri ile makine öğrenimi/derin öğrenme modellerini bir arada kullanarak yüksek doğruluklu anomali tespiti ve onarım gerçekleştirir.
+
+![Veri Önizleme](sunum_assets/ss1_veri.png)
+
+---
+
+## 🏗️ Çözüm Mimarisi
+
+### 4 Katmanlı Piramit
+
+| Katman | Yöntem | Dedektörler | Karar Mekanizması |
+|--------|--------|-------------|-------------------|
+| K1: Deterministik | Fiziksel kurallar | Gap · Range · Delta · Flatline · Duplicate | Herhangi biri → otomatik anomali |
+| K2: İstatistiksel | İstatistiksel analiz | Z-Score (eşik=2.0) · Sliding Window (pencere=50, eşik=3.0) | ≥2 dedektör anlaşmalı |
+| K3: Makine Öğrenimi | Unsupervised ML | Isolation Forest | ≥2 dedektör anlaşmalı |
+| K4: Derin Öğrenme | Temporal DL | LSTM Autoencoder | ≥2 dedektör anlaşmalı |
+
+### Pipeline Akışı
+
+```
+Veri Alımı → Ön İşleme (Detrend) → Anomali Tespiti (7 Dedektör) → Ensemble Voting → Temizleme (Interpolation + Median) → Doğrulama
+```
+
+> **Tasarım kararı:** Temiz noktalar ASLA değiştirilmez — sadece anomali olarak işaretlenen noktalar düzeltilir.
+
+---
+
+## 🔍 Dedektör Detayları
+
+### Katman 1 — Deterministik Kurallar
+- **Gap Detector:** Ardışık timestamp farkı > adaptif eşik veya NaN değeri
+- **Range Detector:** |değer − μ| > 10σ → fiziksel olarak imkansız değerler
+- **Delta Detector:** Ardışık fark > μΔ + 5σΔ → ani sıçrama
+- **Flatline Detector:** Aynı değer ≥ 20 ardışık noktada → sensör donması
+- **Duplicate Detector:** Aynı timestamp'e sahip birden fazla kayıt
+
+### Katman 2 — İstatistiksel Analiz
+- **Z-Score Detector:** Z = |değer − μ| / σ, eşik = 2.0
+- **Sliding Window:** 50 noktalık pencere medyanından sapma / pencere std, eşik = 3.0
+
+### Katman 3 — Makine Öğrenimi
+- **Isolation Forest:** Rastgele bölünmelerle izole edilen noktalar anomali
+
+### Katman 4 — Derin Öğrenme
+- **LSTM Autoencoder:** Zaman serisi paternlerini öğrenir, reconstruction error yüksek → anomali
+
+![Dedektör Detayı](sunum_assets/ss3_dedektor.png)
+
+---
+
+## 📊 Dashboard
+
+Gradio tabanlı interaktif web arayüzü:
+
+### Veri Sekmesi
+Sentetik veri üretimi (NOAA GOES-16 profilleri) veya gerçek CSV/TSV/Excel/JSON/HDF5/Parquet yükleme. Multi-channel desteği.
+
+### Pipeline Sekmesi
+- 🎯 **Pipeline Görselleştirme:** Story-driven dedektör kartları — problem, formül, düzeltme metrikleri
+- 📈 **Sonuç Grafiği:** Ground Truth vs Bozuk vs Temizlenmiş overlay
+- 🔍 **Dedektör Detayı:** Her dedektörün anomali haritası
+- 📋 **İşlem Raporu:** Katmanlı pipeline logu
+- 📊 **Anomali Tablosu:** Tespit edilen anomalilerin listesi
+- 🔍 **Doğrulama:** Onarım doğrulama sonuçları
+- 🔬 **Adım Adım İzleme:** Pipeline tracer tablosu
+
+![Pipeline Sonucu](sunum_assets/ss2_sonuc.png)
+
+![Pipeline Görselleştirme](sunum_assets/ss4_hero.png)
+
+![Katman 1 Kartları](sunum_assets/ss7_katman1_ust.png)
+
+![ML + DL Kartları](sunum_assets/ss6_katman34.png)
+
+---
+
+## 🎮 DataCraft v5
+
+Three.js tabanlı 3D eğitici oyun:
+
+- Oyuncu "Veri Muhafızı" olarak anomalileri toplar
+- 8 görev, 2 aşama (Temel + Gelişmiş)
+- 5 tematik bölge
+- Gerçek pipeline entegrasyonu
+- WASD + mouse kontrol, görev briefing paneli
+- 3-2-1 countdown otomatik geçiş
+
+![DataCraft v5](sunum_assets/ss9_game.png)
+
+---
+
+## 🚀 Kurulum
 
 ```bash
+git clone https://github.com/omercangumus/-cosmic-pipeline.git
+cd cosmic-pipeline
 pip install -r requirements.txt
-python dashboard/app.py          # -> http://localhost:7860
+python dashboard/app.py
 ```
 
-## Architecture
+Tarayıcıda `http://127.0.0.1:7860` adresine gidin.
 
-```
-CSV / Excel / JSON / Synthetic Generator
-       |
-   Ingestion (parse + schema validation)
-       |
-   Detrend (linear trend removal -- detection copy only)
-       |
-  +----+----+
-Classic      ML
-(7 det.)   (IF + LSTM AE)
-  |           |
-  +----+-----+
-  Hybrid Ensemble
-  (hard rules: ANY  +  soft: MAJORITY >=2)
-       |
-  Repair Decision (repair / flag_only / preserve)
-       |
-  Filtering -- ONLY on repairable anomalies
-  (interpolation -> detrend -> median)
-       |
-  Validation + Repair Verification
-       |
-  Tracer (step-by-step report)
-       |
-  Gradio Dashboard
-```
+---
 
-## Fault Types
-
-| Fault | Physical Cause | Signature |
-|-------|----------------|-----------|
-| SEU | High-energy particle bit-flip | Instant spike to impossible value |
-| TID Drift | Cumulative ionizing dose | Monotonic calibration bias |
-| Data Gap | Latch-up / transmission error | Consecutive NaN blocks |
-| Noise Floor | Radiation background rise | Increasing signal variance |
-
-## Detectors (9 total)
-
-**Hard rules** (any-True -> anomaly): `gaps`, `range`, `delta`, `flatline`, `duplicates`
-
-**Soft** (>=2 agreement): `zscore`, `sliding_window`, `isolation_forest`, `lstm_ae`
-
-## Team
-
-| Role | Person |
-|------|--------|
-| Python / AI / Algo | Ahmet Husrev Sayin |
-| Infra / Dashboard  | Omer Can Gumus |
-
-## Commands
+## 🧪 Test
 
 ```bash
-make install   # install dependencies
-make run       # launch Gradio dashboard
-make test      # pytest with coverage
-make train     # train LSTM AE model
+python -m pytest tests/ -q
+# 220 passed
 ```
 
-## Docker
+---
 
-```bash
-docker compose up -d    # -> http://localhost:7860
+## 📈 Sonuçlar
+
+| Metrik | Değer |
+|--------|-------|
+| RMSE Azalma | %86 |
+| F1 Artışı | 110x |
+| İşleme Süresi | 0.2s (2000 nokta, classic) |
+| Test | 220/220 |
+| Dedektör | 7 (4 katman) |
+| Veri Formatı | 6 format |
+
+---
+
+## 🛠️ Teknoloji Yığını
+
+| Kategori | Teknoloji |
+|----------|-----------|
+| Dil | Python 3.11 |
+| Web Arayüzü | Gradio |
+| Görselleştirme | Plotly, HTML/CSS |
+| ML | Scikit-learn (Isolation Forest) |
+| DL | PyTorch (LSTM Autoencoder) |
+| 3D Oyun | Three.js |
+| Test | pytest |
+| Veri | NumPy, Pandas, SciPy |
+
+---
+
+## 📁 Proje Yapısı
+
+```
+cosmic-pipeline/
+├── pipeline/          # Orchestrator, dedektörler, ensemble, filtreler, validator, tracer
+├── models/            # LSTM Autoencoder model ve eğitim scripti
+├── data/              # Sentetik veri üretici, test örnekleri
+├── dashboard/         # Gradio UI, handlers, modern görselleştirme, DataCraft oyunu
+├── tests/             # 220 birim + entegrasyon testi
+├── config/            # Pipeline konfigürasyonu
+└── sunum_assets/      # Ekran görüntüleri
 ```
 
-## Project Structure
+---
 
-```
-cosmic_pipeline/
-+-- pipeline/           # Core: orchestrator, detectors, ensemble, filters, validator, tracer
-+-- data/               # Synthetic telemetry generator (20 satellite channels)
-+-- models/             # LSTM Autoencoder (train + inference + lstm_ae.pt)
-+-- dashboard/          # Gradio app
-+-- config/             # YAML config system
-+-- utils/              # CSV/TSV/Excel/JSON parser
-+-- tests/              # Unit + integration tests
-```
+## 📄 Lisans
 
-## Current Limitations
-
-- **No real-time streaming**: Batch processing only.
-
-## Roadmap
-
-- [x] **Multi-channel pipeline**: Process all numeric columns independently — per-channel detection and filtering
-- [x] **HDF5/Parquet format support**: Optional (`pip install h5py pyarrow`)
-- [ ] Real-time streaming support
-- [ ] Adaptive threshold tuning per sensor type
-
-## License
-
-MIT License -- TUA Astro Hackathon 2026
+MIT
