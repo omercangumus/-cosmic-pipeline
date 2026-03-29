@@ -301,8 +301,9 @@ def upload_csv(file):
                 plot_bgcolor=_GRID, height=350,
             )
             col_update = gr.update(choices=numeric_cols, value=numeric_cols[:3], visible=True)
+            no_gt = pd.DataFrame({"Bilgi": ["Ground truth mevcut degil — yuklenen veri direkt pipeline'a gonderilir"]})
             return (
-                fig, None, table,
+                fig, no_gt, table,
                 f"OK — {len(raw_df)} satir, {len(numeric_cols)} kanal: {', '.join(numeric_cols[:5])}{'...' if len(numeric_cols) > 5 else ''}",
                 col_update,
             )
@@ -333,7 +334,8 @@ def upload_csv(file):
             template=_TEMPLATE, paper_bgcolor=_BG,
             plot_bgcolor=_GRID, height=350,
         )
-        return fig, None, table, f"OK — {len(df)} satir yuklendi", empty_update
+        no_gt = pd.DataFrame({"Bilgi": ["Ground truth mevcut degil — yuklenen veri direkt pipeline'a gonderilir"]})
+        return fig, no_gt, table, f"OK — {len(df)} satir yuklendi", empty_update
     except Exception as e:
         return None, None, None, f"HATA: {_user_friendly_error(e)}", empty_update
 
