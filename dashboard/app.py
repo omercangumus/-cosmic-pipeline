@@ -134,7 +134,7 @@ with gr.Blocks(title="Cosmic Pipeline", theme=theme) as app:
             btn_run.click(
                 fn=run_pipeline_ui,
                 inputs=[radio_method, chk_columns],
-                outputs=[html_pipeline_viz, plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer],
+                outputs=[html_pipeline_viz, plot_result, code_log, plot_det, txt_metrics, tbl_faults, txt_verify, tbl_tracer, code_tracer, tbl_clean],
             )
 
             with gr.Row():

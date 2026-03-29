@@ -414,7 +414,7 @@ def start_game_pipeline(n_samples, method):
 def run_pipeline_ui(method, selected_columns):
     """Run the pipeline and return all UI outputs."""
     if "corrupted" not in _state:
-        return "", None, "Once veri uretin veya yukleyin.", None, "", None, "", None, ""
+        return "", None, "Once veri uretin veya yukleyin.", None, "", None, "", None, "", None
 
     clean = _state.get("clean")
     raw_multi = _state.get("raw_multi")
@@ -437,7 +437,7 @@ def run_pipeline_ui(method, selected_columns):
                     logging.getLogger(name).removeHandler(handler)
         except Exception as e:
             logging.getLogger(__name__).exception("Multi-channel pipeline error")
-            return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
+            return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, "", None
 
         summary = multi_result["summary"]
         channels = multi_result["channels"]
@@ -508,7 +508,9 @@ def run_pipeline_ui(method, selected_columns):
             corrupted_for_viz = _state.get("corrupted")
             pipeline_viz_html = _generate_pipeline_animation(first_valid, corrupted_for_viz)
 
-        return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
+        cleaned_table = first_valid["cleaned_data"].head(50) if first_valid and "cleaned_data" in first_valid else None
+
+        return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary, cleaned_table
 
     # ── Single-channel mode ──
     corrupted = _state["corrupted"]
@@ -524,7 +526,7 @@ def run_pipeline_ui(method, selected_columns):
         result, logs = _run_with_logs(corrupted, method)
     except Exception as e:
         logging.getLogger(__name__).exception("Single-channel pipeline error")
-        return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, ""
+        return "", None, f"Pipeline hatasi: {e}", None, "", None, "", None, "", None
 
     _state["result"] = result
     _state["method"] = method
@@ -576,4 +578,6 @@ def run_pipeline_ui(method, selected_columns):
 
     pipeline_viz_html = _generate_pipeline_animation(result, corrupted)
 
-    return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary
+    cleaned_table = result["cleaned_data"].head(50)
+
+    return pipeline_viz_html, fig_overlay, log_text, fig_detectors, metrics_text, ft_display, rv_text, tracer_table, tracer_summary, cleaned_table
