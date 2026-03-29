@@ -14,7 +14,7 @@ Uzay ortamında uydu sensörleri kozmik radyasyona maruz kalır. Bu radyasyon te
 
 Sistem dual-track mimarisiyle çalışır: klasik sinyal işleme (DSP) teknikleri ile makine öğrenimi/derin öğrenme modellerini bir arada kullanarak yüksek doğruluklu anomali tespiti ve onarım gerçekleştirir.
 
-![Veri Önizleme](<img width="1646" height="1255" alt="image" src="https://github.com/user-attachments/assets/517d81a5-5fae-4c1c-aba6-14a32c42d9bc" />
+![Veri Önizleme](<img width="1474" height="1149" alt="image" src="https://github.com/user-attachments/assets/1b3ada30-29e9-4b6f-abb1-b9c9005aeaed" />
 )
 
 ---
