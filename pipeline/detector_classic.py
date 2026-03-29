@@ -243,6 +243,10 @@ def detect_gaps(
     """
     Detect data gaps: NaN values and large timestamp discontinuities.
 
+    The gap threshold is adaptive: if the data's median sampling interval
+    exceeds max_gap_seconds, the threshold is set to 3x the median interval
+    to avoid false positives on low-frequency telemetry.
+
     Args:
         df: DataFrame with 'timestamp' and 'value' columns.
         max_gap_seconds: Maximum allowed gap between consecutive timestamps.
@@ -254,14 +258,29 @@ def detect_gaps(
 
     if "timestamp" in df.columns and pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
         time_diff = df["timestamp"].diff().dt.total_seconds()
-        large_gaps = time_diff > max_gap_seconds
+        finite_diffs = time_diff.dropna()
+
+        # Adaptive threshold: if median interval > max_gap_seconds,
+        # use 3x median interval instead (data is simply low-frequency)
+        effective_threshold = max_gap_seconds
+        if len(finite_diffs) > 1:
+            median_interval = float(finite_diffs.median())
+            if median_interval > max_gap_seconds:
+                effective_threshold = median_interval * 3
+                logger.info(
+                    "Gap threshold adapted: median interval=%.0fs > %ds, using %.0fs",
+                    median_interval, max_gap_seconds, effective_threshold,
+                )
+
+        large_gaps = time_diff > effective_threshold
         # Flag the point AFTER each large gap
         mask = mask | large_gaps.fillna(False)
 
     n_detected = mask.sum()
     logger.info(
-        "Gap detection (max=%ds): %d gaps/missing detected",
-        max_gap_seconds, n_detected,
+        "Gap detection (threshold=%ds): %d gaps/missing detected",
+        effective_threshold if "timestamp" in df.columns else max_gap_seconds,
+        n_detected,
     )
     return pd.Series(mask, index=df.index)
 
